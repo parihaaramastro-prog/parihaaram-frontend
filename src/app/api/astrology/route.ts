@@ -36,7 +36,10 @@ export async function POST(req: NextRequest) {
 
         const apiResponse = await fetch(`${apiUrl}/calculate`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                "x-api-secret": process.env.API_SECRET || ""
+            },
             body: JSON.stringify(payload),
         });
 
