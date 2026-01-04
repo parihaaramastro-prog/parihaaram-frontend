@@ -56,14 +56,16 @@ function HomeContent() {
     }, []);
 
     // Effect to handle navigation reset
+    // Navigation reset effect removed to prevent loop
+    // URL param is used directly in rendering logic
     useEffect(() => {
+        // Just clear results if dashboard param is present, but DON'T redirect
         if (searchParams.get('dashboard') === 'true') {
             setResults(null);
             setShowForm(false);
-            // Clean up URL
-            router.replace('/');
+            // Don't auto-redirect here, it causes the loop/flash
         }
-    }, [searchParams, router]);
+    }, [searchParams]);
 
     // Effect to handle pending calculation after login
     useEffect(() => {
