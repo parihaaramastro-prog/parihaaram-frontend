@@ -77,9 +77,12 @@ function HomeContent() {
         }
     }, [user]);
 
+    const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+
     const handleCalculate = async (data: { dob: string; tob: string; pob: string; lat?: number; lon?: number }) => {
         if (!user) {
             sessionStorage.setItem('pending_calculation', JSON.stringify(data));
+            setAuthMode('signup'); // Force signup mode
             setIsAuthOpen(true);
             return;
         }
@@ -455,7 +458,7 @@ function HomeContent() {
                     </div>
                 )}
             </div>
-            <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+            <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} initialMode={authMode} />
         </main>
     );
 }

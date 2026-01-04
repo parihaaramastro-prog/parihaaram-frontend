@@ -1,18 +1,17 @@
-"use client";
-
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Mail, Lock, User, Sparkles, Loader2, ShieldCheck } from "lucide-react";
-import { createClient } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
-
 interface AuthModalProps {
     isOpen: boolean;
     onClose: () => void;
+    initialMode?: 'login' | 'signup';
 }
 
-export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
-    const [isLogin, setIsLogin] = useState(true);
+export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
+    const [isLogin, setIsLogin] = useState(initialMode === 'login');
+
+    // Reset state when modal opens/closes or initialMode changes
+    useEffect(() => {
+        setIsLogin(initialMode === 'login');
+    }, [initialMode, isOpen]);
+
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
