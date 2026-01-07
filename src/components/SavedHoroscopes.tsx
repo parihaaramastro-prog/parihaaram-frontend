@@ -13,7 +13,7 @@ interface SavedHoroscopesProps {
 
 const TRANSLATIONS = {
     en: {
-        title: "Profile History",
+        title: "Saved Profiles",
         records: "RECORDS",
         record: "RECORD",
         syncing: "Syncing Profiles...",
@@ -84,7 +84,7 @@ export default function SavedHoroscopes({ onSelect, language = 'en' }: SavedHoro
     if (!user) return null;
 
     return (
-        <section className="w-full max-w-4xl mx-auto mt-20 space-y-6 text-left">
+        <section className="w-full max-w-4xl mx-auto space-y-6 text-left">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                 <div className="flex items-center gap-3">
                     <History className="w-5 h-5 text-indigo-600" />
@@ -113,7 +113,7 @@ export default function SavedHoroscopes({ onSelect, language = 'en' }: SavedHoro
                                 exit={{ opacity: 0, scale: 0.98 }}
                                 transition={{ delay: i * 0.05 }}
                                 onClick={() => onSelect(h)}
-                                className="group relative bg-white border border-slate-200 rounded-xl p-5 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer overflow-hidden"
+                                className="group relative bg-white border border-slate-200 rounded-xl p-5 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer overflow-hidden active:scale-[0.98] active:bg-slate-50 active:border-indigo-500 select-none"
                             >
                                 <div className="flex items-start justify-between">
                                     <div className="space-y-4">
@@ -145,7 +145,7 @@ export default function SavedHoroscopes({ onSelect, language = 'en' }: SavedHoro
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
-                                        <div className="p-2 rounded-lg bg-slate-900 text-white group-hover:bg-indigo-600 transition-colors shadow-sm">
+                                        <div className="hidden sm:block p-2 rounded-lg bg-slate-900 text-white group-hover:bg-indigo-600 transition-colors shadow-sm">
                                             <ChevronRight className="w-4 h-4" />
                                         </div>
                                     </div>

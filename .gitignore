@@ -31,4 +31,6 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.tspython_backend/
+next-env.d.ts
+python_backend/
+secrets/

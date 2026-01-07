@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Cardo } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
@@ -12,6 +12,13 @@ export const metadata: Metadata = {
     keywords: ["Pariharam", "Precision Astrology", "Vedic Computing", "Predictive Analytics"],
 };
 
+export const viewport: Viewport = {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+};
+
 export default function RootLayout({
     children,
 }: Readonly<{
@@ -22,7 +29,7 @@ export default function RootLayout({
             <body className={`${inter.variable} ${serif.variable} font-sans antialiased min-h-screen`}>
                 <div className="app-bg-mesh" />
                 <Navbar />
-                <main className="pt-24 min-h-screen">
+                <main className="pt-32 md:pt-40 min-h-screen">
                     {children}
                 </main>
             </body>

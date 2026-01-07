@@ -3,15 +3,25 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    Compass, Sparkles, History, User,
+    Compass, Sparkles, History, User, Bot,
     Briefcase, ShieldCheck, Users, LogOut, Menu, X
 } from "lucide-react";
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { createClient } from "@/lib/supabase";
+import UserProfileDropdown from "./UserProfileDropdown";
 import AuthModal from "./AuthModal";
 
 export default function Navbar() {
+    const pathname = usePathname();
     const [isScrolled, setIsScrolled] = useState(false);
+
+    // Hide navbar on astrologer and admin pages
+    if (pathname?.startsWith('/astrologer') || pathname?.startsWith('/admin')) {
+        return null;
+    }
+
     const [isAuthOpen, setIsAuthOpen] = useState(false);
     const [user, setUser] = useState<any>(null);
     const [role, setRole] = useState<string | null>(null);
@@ -67,9 +77,10 @@ export default function Navbar() {
             { id: 'jobs', label: 'Job Dashboard', icon: Briefcase, href: '/astrologer/dashboard' },
         ],
         customer: [
-            { id: 'analysis', label: 'Horoscope', icon: Compass, href: '/?dashboard=true' },
+            { id: 'dashboard', label: 'Dashboard', icon: Compass, href: '/dashboard' },
             { id: 'expertise', label: 'Consult', icon: Sparkles, href: '/consultation' },
             { id: 'history', label: 'Readings', icon: History, href: '/consultation/history' },
+            { id: 'chat', label: 'AI Astrologer', icon: Bot, href: '/chat' },
         ],
     };
 
@@ -78,16 +89,21 @@ export default function Navbar() {
     return (
         <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isScrolled ? 'py-4' : 'py-8'}`}>
             <div className="max-w-[1400px] mx-auto px-6">
-                <div className={`relative px-8 h-18 rounded-[2rem] border transition-all duration-700 flex items-center justify-between ${isScrolled ? 'bg-white/80 backdrop-blur-2xl border-slate-200/50 shadow-2xl shadow-indigo-500/5' : 'bg-transparent border-transparent'}`}>
+                <div className={`relative px-8 h-18 rounded-[2rem] border transition-all duration-700 flex items-center justify-between ${isScrolled ? 'bg-slate-50/90 backdrop-blur-2xl border-indigo-200/50 shadow-2xl shadow-indigo-500/10' : 'bg-slate-50/70 backdrop-blur-xl border-white/40 shadow-lg shadow-indigo-500/5'}`}>
 
                     {/* Brand */}
-                    <Link href="/" className="flex items-center gap-3 group">
-                        <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-lg group-hover:bg-indigo-600 transition-all duration-500 group-hover:rotate-6">
-                            <Compass className="w-5 h-5" />
+                    <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-3 group">
+                        <div className="relative w-16 h-16 flex items-center justify-center">
+                            <Image
+                                src="/parihaaram-logo.png"
+                                alt="Parihaaram Logo"
+                                width={64}
+                                height={64}
+                                className="object-contain transform group-hover:scale-110 transition-transform duration-500"
+                            />
                         </div>
                         <div className="flex flex-col">
-                            <span className="text-sm font-black tracking-[0.3em] uppercase text-slate-900 leading-none">Pariharam</span>
-                            <span className="text-[9px] font-bold tracking-[0.2em] uppercase text-indigo-600/60 mt-1">Ancient Vedic Wisdom</span>
+                            <span className="text-2xl font-bold tracking-tight text-slate-900 leading-none">Parihaaram</span>
                         </div>
                     </Link>
 
@@ -110,31 +126,14 @@ export default function Navbar() {
                     {/* Profile & Auth */}
                     <div className="flex items-center gap-4">
                         {user ? (
-                            <div className="flex items-center gap-4">
-                                <div className="hidden lg:flex flex-col items-end">
-                                    <span className="text-[10px] font-bold text-slate-900 uppercase tracking-widest">{user?.user_metadata?.full_name || 'User'}</span>
-                                    <span className="text-[9px] font-medium text-emerald-600 uppercase tracking-widest flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                        Session Active
-                                    </span>
-                                </div>
-                                <button
-                                    onClick={handleLogout}
-                                    title="End Session"
-                                    className="p-2.5 rounded-full bg-slate-100 hover:bg-red-50 text-slate-400 hover:text-red-600 transition-all border border-slate-200/50"
-                                >
-                                    <LogOut className="w-4 h-4" />
-                                </button>
-                            </div>
+                            <UserProfileDropdown user={user} />
                         ) : (
                             <button
                                 onClick={() => setIsAuthOpen(true)}
-                                className="flex items-center gap-4 pl-6 pr-2 py-2 bg-slate-900 hover:bg-indigo-600 text-white rounded-full transition-all duration-500 shadow-xl shadow-indigo-500/10"
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-indigo-600 text-white rounded-full transition-all duration-300 shadow-lg shadow-indigo-500/10 active:scale-95"
                             >
-                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] hidden sm:block">Sign In</span>
-                                <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-                                    <User className="w-4 h-4" />
-                                </div>
+                                <span className="text-xs font-bold uppercase tracking-wider">Login</span>
+                                <User className="w-3 h-3" />
                             </button>
                         )}
                     </div>

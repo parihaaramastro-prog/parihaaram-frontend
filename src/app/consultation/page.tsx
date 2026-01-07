@@ -99,24 +99,27 @@ export default function ConsultationPage() {
     }
 
     return (
-        <main className="min-h-screen pb-40 px-6">
-            <div className="max-w-5xl mx-auto space-y-16">
-                {/* Header */}
-                <div className="text-center space-y-4">
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-indigo-600 text-[10px] font-bold uppercase tracking-widest"
+        <main className="min-h-screen pt-0 pb-20 px-6">
+            <div className="max-w-5xl mx-auto space-y-12">
+                <div>
+                    <button
+                        onClick={() => router.push('/dashboard')}
+                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-slate-900/90 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest border border-white/10 shadow-xl hover:bg-slate-800 transition-all hover:-translate-y-0.5"
                     >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        Expert Consultation
-                    </motion.div>
+                        <span>← Back to Home Page</span>
+                    </button>
+                </div>
+
+                {/* Header */}
+                <div className="text-center space-y-6">
                     <h1 className="text-5xl md:text-6xl font-bold text-slate-900 tracking-tight leading-none uppercase">
                         Expert <span className="text-indigo-600">Guidance</span>
                     </h1>
                     <p className="text-slate-500 text-sm font-medium max-w-xl mx-auto">
                         Connect with seasoned astrologers for custom reports tailored to your specific life questions.
                     </p>
+
+
                 </div>
 
                 {/* Form Section */}
@@ -206,7 +209,7 @@ export default function ConsultationPage() {
                                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                                     <>
                                         <BookOpen className="w-4 h-4 text-indigo-400" />
-                                        <span>Submit Consultation Request</span>
+                                        <span>Submit Request</span>
                                     </>
                                 )}
                             </button>

@@ -8,6 +8,7 @@ export interface SavedHoroscope {
     pob: string;
     lat: number;
     lon: number;
+    chart_data?: any; // Cached calculation results
     created_at: string;
 }
 
@@ -27,7 +28,8 @@ export const horoscopeService = {
                 tob: data.tob,
                 pob: data.pob,
                 lat: data.lat,
-                lon: data.lon
+                lon: data.lon,
+                chart_data: data.chart_data
             });
 
         if (error) throw error;
