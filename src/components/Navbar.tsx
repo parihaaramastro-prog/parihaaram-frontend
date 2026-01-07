@@ -93,13 +93,15 @@ export default function Navbar() {
 
                     {/* Brand */}
                     <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-3 group">
-                        <div className="relative w-16 h-16 flex items-center justify-center">
+                        <div className="relative h-12 w-auto min-w-[3rem] flex items-center justify-center">
                             <Image
                                 src="/parihaaram-logo.png"
                                 alt="Parihaaram Logo"
-                                width={64}
-                                height={64}
-                                className="object-contain transform group-hover:scale-110 transition-transform duration-500"
+                                width={0}
+                                height={0}
+                                sizes="100vw"
+                                className="h-full w-auto object-contain transform group-hover:scale-110 transition-transform duration-500"
+                                style={{ width: 'auto', height: '100%' }}
                             />
                         </div>
                         <div className="flex flex-col">

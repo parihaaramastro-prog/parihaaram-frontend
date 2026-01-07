@@ -103,9 +103,11 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', cust
                                 <Image
                                     src="/parihaaram-logo.png"
                                     alt="Parihaaram Logo"
-                                    width={96}
-                                    height={96}
-                                    className="w-24 h-24 object-contain"
+                                    width={0}
+                                    height={0}
+                                    sizes="100vw"
+                                    className="h-24 w-auto object-contain"
+                                    style={{ width: 'auto', height: '100%' }}
                                 />
                             </div>
                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-widest shadow-sm">
