@@ -143,7 +143,7 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                         <input
                             type="text"
                             placeholder={t.namePlaceholder}
-                            className="divine-input !pl-12"
+                            className="divine-input !pl-14"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         />
@@ -159,7 +159,7 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                             </div>
                             <input
                                 type="date"
-                                className="divine-input !pl-12"
+                                className="divine-input !pl-14"
                                 value={formData.dob}
                                 onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
                             />
@@ -174,7 +174,7 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                             </div>
                             <input
                                 type="time"
-                                className="divine-input !pl-12"
+                                className="divine-input !pl-14"
                                 value={formData.tob}
                                 onChange={(e) => setFormData({ ...formData, tob: e.target.value })}
                             />
@@ -195,7 +195,7 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                         <input
                             type="text"
                             placeholder={t.pobPlaceholder}
-                            className="divine-input !pl-12"
+                            className="divine-input !pl-14"
                             value={formData.pob}
                             onChange={handlePobChange}
                             onFocus={() => {
