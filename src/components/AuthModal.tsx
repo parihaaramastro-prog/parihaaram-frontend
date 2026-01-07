@@ -50,6 +50,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', cust
                     email,
                     password,
                     options: {
+                        emailRedirectTo: `${window.location.origin}/auth/callback`,
                         data: {
                             full_name: name,
                         },

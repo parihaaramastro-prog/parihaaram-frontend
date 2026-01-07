@@ -195,7 +195,7 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                         <input
                             type="text"
                             placeholder={t.pobPlaceholder}
-                            className="divine-input !pl-14"
+                            className={`divine-input !pl-14 ${formData.pob && (!formData.lat || !formData.lon) ? 'border-amber-300 focus:border-amber-500' : ''}`}
                             value={formData.pob}
                             onChange={handlePobChange}
                             onFocus={() => {
@@ -203,6 +203,12 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                             }}
                         />
                     </div>
+                    {formData.pob && (!formData.lat || !formData.lon) && (
+                        <p className="mt-1.5 text-[10px] font-bold text-amber-600 tracking-wide flex items-center gap-1.5">
+                            <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
+                            Please select a city from the list
+                        </p>
+                    )}
 
                     {/* Autocomplete Dropdown */}
                     <AnimatePresence>
@@ -231,9 +237,9 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                 <motion.button
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
-                    disabled={loading || !formData.name || !formData.dob || !formData.tob || !formData.pob}
+                    disabled={loading || !formData.name || !formData.dob || !formData.tob || !formData.pob || (!formData.lat && !formData.lon)}
                     onClick={() => onCalculate(formData)}
-                    className="divine-button w-full h-12 flex items-center justify-center gap-3 mt-4"
+                    className="divine-button w-full h-12 flex items-center justify-center gap-3 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loading ? (
                         <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />

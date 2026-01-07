@@ -34,7 +34,17 @@ export async function GET(request: Request) {
         )
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (!error) {
-            return NextResponse.redirect(`${origin}${next}`)
+            const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
+            const isLocalEnv = process.env.NODE_ENV === 'development'
+            if (isLocalEnv) {
+                return NextResponse.redirect(`${origin}${next}`)
+            } else if (process.env.NEXT_PUBLIC_SITE_URL) {
+                return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}${next}`)
+            } else if (forwardedHost) {
+                return NextResponse.redirect(`https://${forwardedHost}${next}`)
+            } else {
+                return NextResponse.redirect(`${origin}${next}`)
+            }
         }
     }
 
