@@ -4,16 +4,23 @@ import { useState, useEffect, useRef } from "react";
 import {
     Send, Bot, User, ArrowLeft, Globe,
     Lightbulb, MoreHorizontal, ArrowUp, Sidebar, CircleUser,
-    Plus, MessageSquare, Trash2, X
+    Plus, MessageSquare, Trash2, X, Sparkles, Users, Briefcase, Heart, Activity, Coins, Check
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { SavedHoroscope } from "@/lib/services/horoscope";
+import { aiService, ChatIntent } from "@/lib/services/ai";
+import { creditService } from "@/lib/services/credits";
+import { loadRazorpay } from "@/lib/loadRazorpay";
+import ProfileSelectionModal from "@/components/ProfileSelectionModal";
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
     role: 'user' | 'ai';
     content: string;
     timestamp: number;
+    isHidden?: boolean;
 }
 
 interface ChatSession {
@@ -21,6 +28,8 @@ interface ChatSession {
     title: string;
     messages: Message[];
     updatedAt: number;
+    primaryProfileId?: string;
+    secondaryProfileId?: string;
 }
 
 export default function ChatPage() {
@@ -32,6 +41,18 @@ export default function ChatPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [isMobile, setIsMobile] = useState(false);
 
+    // Context State
+    const [primaryProfile, setPrimaryProfile] = useState<SavedHoroscope | null>(null);
+    const [secondaryProfile, setSecondaryProfile] = useState<SavedHoroscope | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalMode, setModalMode] = useState<'primary' | 'secondary'>('primary');
+    const [isTyping, setIsTyping] = useState(false);
+
+    // Credit State
+    const [credits, setCredits] = useState<number | null>(null);
+    const [showPayModal, setShowPayModal] = useState(false);
+    const [paymentSuccess, setPaymentSuccess] = useState(false);
+
     // Sync with hydration
     const [mounted, setMounted] = useState(false);
 
@@ -39,7 +60,14 @@ export default function ChatPage() {
         setMounted(true);
         const stored = localStorage.getItem('horoscope_chats');
         if (stored) {
-            setChats(JSON.parse(stored));
+            const parsed = JSON.parse(stored);
+            if (parsed.length > 0) {
+                setChats(parsed);
+                // Set to most recent or first
+                setCurrentChatId(parsed[0].id);
+            } else {
+                createNewChat();
+            }
         } else {
             createNewChat();
         }
@@ -62,17 +90,32 @@ export default function ChatPage() {
         }
     }, [chats, mounted]);
 
+    // Fetch Credits on Mount
+    useEffect(() => {
+        const fetchCredits = async () => {
+            const c = await creditService.getCredits();
+            setCredits(c);
+        };
+        fetchCredits();
+    }, []);
+
     const getCurrentChat = () => chats.find(c => c.id === currentChatId);
 
     const createNewChat = () => {
         const newChat: ChatSession = {
             id: Date.now().toString(),
-            title: "New Chat",
-            messages: [],
+            title: "New Session",
+            messages: [{
+                role: 'ai',
+                content: "Hello! I am Parihaaram AI. I can analyze birth charts and compatibility.\n\nTo begin, please tell me **which profile** you would like to analyze today?",
+                timestamp: Date.now()
+            }],
             updatedAt: Date.now()
         };
         setChats(prev => [newChat, ...prev]);
         setCurrentChatId(newChat.id);
+        setPrimaryProfile(null);
+        setSecondaryProfile(null);
         if (isMobile) setIsSidebarOpen(false);
     };
 
@@ -92,31 +135,132 @@ export default function ChatPage() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [currentChatId, chats]);
+    }, [currentChatId, chats, isTyping]);
 
-    const handleSend = (text: string = input) => {
+    const handleProfileSelect = (profile: SavedHoroscope) => {
+        if (modalMode === 'primary') {
+            setPrimaryProfile(profile);
+
+            // Add a system-like message to show selection
+            const selectionMsg: Message = {
+                role: 'user',
+                content: `I've selected **${profile.name}**'s profile.`,
+                timestamp: Date.now()
+            };
+
+            setChats(prev => prev.map(chat => {
+                if (chat.id === currentChatId) {
+                    return {
+                        ...chat,
+                        messages: [...chat.messages, selectionMsg],
+                        primaryProfileId: profile.id
+                    };
+                }
+                return chat;
+            }));
+
+            // Trigger AI acknowledgement/analysis
+            setTimeout(() => {
+                handleSend(`Analyze ${profile.name}'s chart and provide a detailed 'Life Prediction' covering:
+1. Core Nature & Personality
+2. Current Emotional State
+3. Best Career Paths
+4. Marriage & Relationship Outlook
+5. Relationship with Parents
+
+At the end, please list 3 specific follow-up questions I can ask to elaborate on these topics.`, true, { p1: profile });
+            }, 500);
+
+        } else {
+            setSecondaryProfile(profile);
+            const selectionMsg: Message = {
+                role: 'user',
+                content: `I've selected **${profile.name}** as the partner profile.`,
+                timestamp: Date.now()
+            };
+
+            setChats(prev => prev.map(chat => {
+                if (chat.id === currentChatId) {
+                    return {
+                        ...chat,
+                        messages: [...chat.messages, selectionMsg],
+                        secondaryProfileId: profile.id
+                    };
+                }
+                return chat;
+            }));
+
+            setTimeout(() => {
+                handleSend(`Compare ${primaryProfile?.name} and ${profile.name} for compatibility.`, true, { p1: primaryProfile || undefined, p2: profile });
+            }, 500);
+        }
+    };
+
+    const openProfileSelector = (mode: 'primary' | 'secondary') => {
+        setModalMode(mode);
+        setIsModalOpen(true);
+    };
+
+    // Helper to check if message needs a button
+    const shouldShowProfileButton = (content: string) => {
+        const lower = content.toLowerCase();
+        return lower.includes("which profile") || lower.includes("select a profile") || lower.includes("choose a profile") || lower.includes("select the partner");
+    };
+
+    const shouldShowPartnerButton = (content: string) => {
+        const lower = content.toLowerCase();
+        return lower.includes("select the partner") || lower.includes("second profile") || lower.includes("partner's profile");
+    };
+
+    const handleSend = async (text: string = input, hidden: boolean = false, overrideParams?: { p1?: SavedHoroscope, p2?: SavedHoroscope }) => {
         if (!text.trim() || !currentChatId) return;
 
         const timestamp = Date.now();
-        const userMsg: Message = { role: 'user', content: text, timestamp };
+        const userMsg: Message = { role: 'user', content: text, timestamp, isHidden: hidden };
+
+        // Determine effective profiles (State might be stale in closures, so prefer overrides)
+        const effectivePrimary = overrideParams?.p1 || primaryProfile;
+        const effectiveSecondary = overrideParams?.p2 || secondaryProfile;
 
         setChats(prev => prev.map(chat => {
             if (chat.id === currentChatId) {
                 const updatedMessages = [...chat.messages, userMsg];
-                const title = chat.messages.length === 0 ? text.slice(0, 30) + (text.length > 30 ? '...' : '') : chat.title;
-                return { ...chat, messages: updatedMessages, title, updatedAt: timestamp };
+                // Update title ONLY if visible message and first one
+                const title = (chat.messages.length === 0 && !hidden) ? text.slice(0, 30) + (text.length > 30 ? '...' : '') : chat.title;
+                return {
+                    ...chat,
+                    messages: updatedMessages,
+                    title,
+                    updatedAt: timestamp,
+                    primaryProfileId: effectivePrimary?.id,
+                    secondaryProfileId: effectiveSecondary?.id
+                };
             }
             return chat;
         }));
 
-        setInput("");
+        if (!hidden) setInput("");
+        setIsTyping(true);
 
-        setTimeout(() => {
+        try {
+            // Get current history for this chat
+            const currentHistory = getCurrentChat()?.messages || [];
+
+            const response = await aiService.generateResponse(text, {
+                primaryProfile: effectivePrimary || undefined,
+                secondaryProfile: effectiveSecondary || undefined
+            }, currentHistory);
+
             const aiMsg: Message = {
                 role: 'ai',
-                content: "I'm analyzing your chart aspects based on that question. Give me a moment to consult the stars...",
+                content: response.reply,
                 timestamp: Date.now()
             };
+
+            // Update Credits if provided
+            if (response.remainingCredits !== undefined) {
+                setCredits(response.remainingCredits);
+            }
 
             setChats(prev => prev.map(chat => {
                 if (chat.id === currentChatId) {
@@ -124,22 +268,231 @@ export default function ChatPage() {
                 }
                 return chat;
             }));
-        }, 1000);
+        } catch (error: any) {
+            console.error(error);
+            if (error.message === "OUT_OF_CREDITS") {
+                setShowPayModal(true);
+                // Also add an AI system message saying "Out of credits"
+                const systemMsg: Message = {
+                    role: 'ai',
+                    content: "You have run out of messages. Please recharge to continue.",
+                    timestamp: Date.now()
+                };
+                setChats(prev => prev.map(chat => {
+                    if (chat.id === currentChatId) {
+                        return { ...chat, messages: [...chat.messages, systemMsg] };
+                    }
+                    return chat;
+                }));
+            }
+        } finally {
+            setIsTyping(false);
+        }
     };
 
     const currentMessages = getCurrentChat()?.messages || [];
-    const suggestions = [
-        "What's my career outlook?",
-        "Relationship compatibility?",
-        "Any health warnings?",
-        "Lucky colors for today?"
+
+    // Filter out hidden messages for display
+    const visibleMessages = currentMessages.filter(m => !m.isHidden);
+
+    const presets = [
+        { icon: <Briefcase className="w-4 h-4" />, label: "Start Business", query: "Is this a good time to start a business based on my Dasha?" },
+        {
+            icon: <Heart className="w-4 h-4" />, label: "Compatibility", action: () => {
+                if (!primaryProfile) {
+                    alert("Please select a primary profile first.");
+                    openProfileSelector('primary');
+                } else {
+                    openProfileSelector('secondary');
+                }
+            }
+        },
+        { icon: <Activity className="w-4 h-4" />, label: "Health Outlook", query: "What does my chart say about health and vitality?" },
+        { icon: <Sparkles className="w-4 h-4" />, label: "General Prediction", query: "Give me a general prediction based on my Lagna and Moon sign." }
     ];
 
     if (!mounted) return null;
 
     return (
-        // Adjusted top padding to match RootLayout (pt-32 md:pt-40) and ensure full height without overlaying Navbar irregularly
         <main className="fixed inset-x-0 bottom-0 top-[120px] md:top-[160px] bg-slate-50 flex flex-col items-center z-0 md:px-6">
+
+            <ProfileSelectionModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSelect={handleProfileSelect}
+                title={modalMode === 'primary' ? "Select Main Profile" : "Select Partner Profile"}
+            />
+
+            {/* Pay Modal Mock */}
+            {showPayModal && (
+                <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center"
+                    >
+                        {paymentSuccess ? (
+                            <div className="text-center py-2">
+                                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600">
+                                    <Check className="w-10 h-10" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-slate-900 mb-2">Payment Successful!</h2>
+                                <p className="text-slate-500 mb-8">10 credits have been added to your account instantly.</p>
+                                <button
+                                    onClick={() => { setPaymentSuccess(false); setShowPayModal(false); }}
+                                    className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold shadow-lg shadow-slate-900/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                >
+                                    Continue Chatting
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-600">
+                                    <Coins className="w-8 h-8" />
+                                </div>
+
+                                {(credits ?? 0) <= 0 ? (
+                                    <>
+                                        <h2 className="text-2xl font-bold text-slate-900 mb-2">Out of Credits</h2>
+                                        <p className="text-slate-500 mb-6">You have used your free messages. Recharge now to continue talking to Parihaaram AI.</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <h2 className="text-2xl font-bold text-slate-900 mb-2">Top Up Credits</h2>
+                                        <p className="text-slate-500 mb-6">You have <span className="font-bold text-indigo-600">{credits}</span> credits remaining.</p>
+                                    </>
+                                )}
+
+                                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-6">
+                                    <div className="text-sm font-bold text-indigo-900 uppercase tracking-wider mb-1">Standard Pack</div>
+                                    <div className="text-3xl font-bold text-indigo-600">₹49 <span className="text-sm font-medium text-indigo-400">/ 10 msgs</span></div>
+                                </div>
+
+                                <button
+                                    disabled={credits === undefined}
+                                    onClick={async () => {
+                                        const isRazorpayEnabled = localStorage.getItem('razorpay_enabled') === 'true';
+
+                                        if (!isRazorpayEnabled) {
+                                            // SIMULATION MODE
+                                            const success = await creditService.topUpCredits(10);
+                                            if (success) {
+                                                setCredits(prev => (prev || 0) + 10);
+                                                setPaymentSuccess(true);
+
+                                                // If we were effectively out of credits (blocked), clean up the error message
+                                                if ((credits ?? 0) <= 0) {
+                                                    setChats(prev => prev.map(chat => {
+                                                        if (chat.id === currentChatId) {
+                                                            const lastMsg = chat.messages[chat.messages.length - 1];
+                                                            if (lastMsg.role === 'ai' && lastMsg.content.includes("run out of messages")) {
+                                                                return {
+                                                                    ...chat,
+                                                                    messages: chat.messages.slice(0, -1)
+                                                                };
+                                                            }
+                                                        }
+                                                        return chat;
+                                                    }));
+                                                }
+                                            } else {
+                                                alert("Recharge failed. Please try again.");
+                                            }
+                                            return;
+                                        }
+
+                                        // RAZORPAY MODE
+                                        const res = await loadRazorpay();
+                                        if (!res) {
+                                            alert('Razorpay SDK failed to load. Are you online?');
+                                            return;
+                                        }
+
+                                        // Create Order
+                                        const orderRes = await fetch('/api/create-order', {
+                                            method: 'POST',
+                                            body: JSON.stringify({ amount: 4900 }), // ₹49.00
+                                        });
+                                        const orderData = await orderRes.json();
+
+                                        if (!orderRes.ok) {
+                                            alert("Error creating order: " + (orderData.error || "Unknown"));
+                                            return;
+                                        }
+
+                                        const options = {
+                                            key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_placeholder",
+                                            amount: orderData.amount,
+                                            currency: orderData.currency,
+                                            name: "Parihaaram AI",
+                                            description: "10 Credit Pack",
+                                            order_id: orderData.id,
+                                            handler: async function (response: any) {
+                                                // Verify Payment
+                                                const verifyRes = await fetch('/api/verify-payment', {
+                                                    method: 'POST',
+                                                    body: JSON.stringify({
+                                                        orderCreationId: orderData.id,
+                                                        razorpayPaymentId: response.razorpay_payment_id,
+                                                        razorpaySignature: response.razorpay_signature,
+                                                    }),
+                                                });
+                                                const verifyData = await verifyRes.json();
+
+                                                if (verifyRes.ok) {
+                                                    // Payment Verified, Add Credits
+                                                    const success = await creditService.topUpCredits(10);
+                                                    if (success) {
+                                                        setCredits(prev => (prev || 0) + 10);
+                                                        setPaymentSuccess(true);
+
+                                                        // Clean up error message
+                                                        if ((credits ?? 0) <= 0) {
+                                                            setChats(prev => prev.map(chat => {
+                                                                if (chat.id === currentChatId) {
+                                                                    const lastMsg = chat.messages[chat.messages.length - 1];
+                                                                    if (lastMsg.role === 'ai' && lastMsg.content.includes("run out of messages")) {
+                                                                        return { ...chat, messages: chat.messages.slice(0, -1) };
+                                                                    }
+                                                                }
+                                                                return chat;
+                                                            }));
+                                                        }
+                                                    } else {
+                                                        alert("Payment verified but credit update failed. Contact support.");
+                                                    }
+                                                } else {
+                                                    alert("Payment verification failed.");
+                                                }
+                                            },
+                                            prefill: {
+                                                name: primaryProfile?.name || "User",
+                                                email: "user@example.com", // Should get from Auth
+                                                contact: "9999999999",
+                                            },
+                                            theme: {
+                                                color: "#4f46e5",
+                                            },
+                                        };
+
+                                        const paymentObject = new (window as any).Razorpay(options);
+                                        paymentObject.open();
+                                    }}
+                                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-indigo-500/30"
+                                >
+                                    {(credits ?? 0) <= 0 ? "Pay ₹49 to Continue" : "Add 10 Credits (₹49)"}
+                                </button>
+                                <button
+                                    onClick={() => setShowPayModal(false)}
+                                    className="mt-3 text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    {(credits ?? 0) <= 0 ? "Maybe Later" : "Close"}
+                                </button>
+                            </>
+                        )}
+                    </motion.div>
+                </div>
+            )}
 
             <div className="flex-1 w-full max-w-[1400px] mx-auto flex relative overflow-hidden bg-white md:shadow-2xl md:ring-1 md:ring-slate-900/5 md:my-6 md:rounded-[2.5rem] md:h-[calc(100%-3rem)]">
 
@@ -220,33 +573,78 @@ export default function ChatPage() {
 
                 {/* Main Chat Area */}
                 <div className="flex-1 flex flex-col relative bg-white w-full h-full">
-                    {/* Header */}
-                    <header className="px-4 py-3 md:px-6 md:py-4 flex items-center justify-between border-b border-slate-50 z-10 shrink-0">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                                className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-50 text-slate-500 transition-colors"
-                            >
-                                <Sidebar className="w-5 h-5" />
-                            </button>
-                            <div className="flex flex-col">
-                                <span className="font-bold text-slate-900 text-sm md:text-base leading-none">AI Astrologer</span>
-                                <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Online
-                                </span>
+
+                    {/* Header with Context */}
+                    <header className="flex flex-col border-b border-slate-50 z-10 shrink-0 bg-white">
+                        <div className="px-4 py-3 md:px-6 md:py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                    className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-50 text-slate-500 transition-colors"
+                                >
+                                    <Sidebar className="w-5 h-5" />
+                                </button>
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-slate-900 text-sm md:text-base leading-none">AI Astrologer</span>
+                                    <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Online
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Credits & End Chat Actions */}
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setShowPayModal(true)}
+                                    className="hidden sm:flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+                                >
+                                    <Coins className="w-4 h-4" />
+                                    <span>{credits !== null ? credits : '-'} Credits</span>
+                                </button>
+
+                                <button
+                                    onClick={() => router.push('/dashboard')}
+                                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
+                                >
+                                    End Chat
+                                </button>
                             </div>
                         </div>
-                        <button
-                            onClick={() => router.push('/dashboard')}
-                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
-                        >
-                            End Chat
-                        </button>
+
+                        {/* Active Context Bar */}
+                        <div className="px-4 md:px-6 pb-3 pt-0 flex flex-wrap gap-2 items-center">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2">Context:</span>
+
+                            {/* Primary Profile */}
+                            <button
+                                onClick={() => openProfileSelector('primary')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${primaryProfile ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-600'}`}
+                            >
+                                <User className="w-3.5 h-3.5" />
+                                {primaryProfile ? primaryProfile.name : "Select Profile"}
+                            </button>
+
+                            {/* Secondary Profile (Only if primary selected) */}
+                            {primaryProfile && (
+                                <>
+                                    <span className="text-slate-300 text-[10px]">&</span>
+                                    <button
+                                        onClick={() => openProfileSelector('secondary')}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${secondaryProfile ? 'bg-pink-50 border-pink-200 text-pink-900' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-pink-300 hover:text-pink-600'}`}
+                                    >
+                                        <Users className="w-3.5 h-3.5" />
+                                        {secondaryProfile ? secondaryProfile.name : "Add Partner"}
+                                        {secondaryProfile && <X className="w-3 h-3 ml-1 text-pink-400 hover:text-pink-700" onClick={(e) => { e.stopPropagation(); setSecondaryProfile(null); }} />}
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </header>
 
                     {/* Messages */}
                     <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-100">
-                        {currentMessages.length === 0 ? (
+                        {/* We use visibleMessages here instead of currentMessages to respect isHidden */}
+                        {visibleMessages.length === 0 ? (
                             <div className="h-full flex flex-col justify-center items-center pb-20 text-center max-w-lg mx-auto px-4">
                                 <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 sm:mb-8">
                                     <Bot className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-600" />
@@ -254,10 +652,27 @@ export default function ChatPage() {
                                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-medium text-slate-900 tracking-tight leading-tight mb-4">
                                     How can <span className="text-indigo-600">stars</span><br />guide you today?
                                 </h1>
-                                <p className="text-slate-500 text-sm sm:text-base">Ask about career, love, or health.</p>
+                                <p className="text-slate-500 text-sm sm:text-base mb-8">
+                                    Start by selecting a profile to get personalized insights based on Lagna, Dasha, and more.
+                                </p>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                                    {presets.map((p, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => p.action ? p.action() : handleSend(p.query)}
+                                            className="flex items-center gap-3 p-4 bg-white border border-slate-200 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-100/50 rounded-xl text-left transition-all group"
+                                        >
+                                            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                {p.icon}
+                                            </div>
+                                            <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-900">{p.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         ) : (
-                            currentMessages.map((msg, i) => (
+                            visibleMessages.map((msg, i) => (
                                 <motion.div
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
@@ -268,43 +683,63 @@ export default function ChatPage() {
                                         {msg.role === 'ai' ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
                                     </div>
 
-                                    <div
-                                        className={`p-4 sm:p-5 rounded-3xl text-sm sm:text-[15px] leading-relaxed shadow-sm ${msg.role === 'user'
-                                            ? 'bg-indigo-600 text-white rounded-tr-sm'
-                                            : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm shadow-md'
-                                            }`}
-                                    >
-                                        {msg.content}
+                                    <div className="flex flex-col gap-2">
+                                        <div
+                                            className={`p-4 sm:p-5 rounded-3xl text-sm sm:text-[15px] leading-relaxed shadow-sm ${msg.role === 'user'
+                                                ? 'bg-indigo-600 text-white rounded-tr-sm'
+                                                : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm shadow-md'
+                                                }`}
+                                        >
+                                            <ReactMarkdown
+                                                components={{
+                                                    strong: ({ node, ...props }) => <span className="font-bold" {...props} />,
+                                                    ul: ({ node, ...props }) => <ul className="list-disc list-outside ml-4 space-y-1" {...props} />,
+                                                    ol: ({ node, ...props }) => <ol className="list-decimal list-outside ml-4 space-y-1" {...props} />,
+                                                    p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />
+                                                }}
+                                            >
+                                                {msg.content}
+                                            </ReactMarkdown>
+                                        </div>
+
+                                        {/* In-Chat Actions */}
+                                        {msg.role === 'ai' && shouldShowProfileButton(msg.content) && (
+                                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2">
+                                                <button
+                                                    onClick={() => openProfileSelector(shouldShowPartnerButton(msg.content) ? 'secondary' : 'primary')}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-indigo-200"
+                                                >
+                                                    <User className="w-4 h-4" />
+                                                    {shouldShowPartnerButton(msg.content) ? "Select Partner" : "Select Profile"}
+                                                </button>
+                                            </motion.div>
+                                        )}
                                     </div>
                                 </motion.div>
                             ))
                         )}
+                        {isTyping && (
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-4 max-w-3xl mr-auto">
+                                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mt-1">
+                                    <Bot className="w-4 h-4" />
+                                </div>
+                                <div className="bg-white border border-slate-100 p-4 rounded-3xl rounded-tl-sm shadow-md flex gap-1">
+                                    <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
+                                    <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce delay-100" />
+                                    <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce delay-200" />
+                                </div>
+                            </motion.div>
+                        )}
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Suggestions & Input */}
+                    {/* Input Area */}
                     <div className="p-4 sm:p-6 bg-white shrink-0 max-w-4xl mx-auto w-full">
-                        {currentMessages.length === 0 && (
-                            <div className="pb-4 flex gap-2 overflow-x-auto scrollbar-hide justify-start md:justify-center -mx-4 px-4 md:mx-0 md:px-0">
-                                {suggestions.map((s, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => handleSend(s)}
-                                        className="shrink-0 bg-white border border-slate-200 hover:border-indigo-300 hover:shadow-md px-4 py-2 rounded-full text-xs sm:text-sm font-medium text-slate-600 transition-all whitespace-nowrap"
-                                    >
-                                        {s}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
                         <div className="relative bg-slate-50 rounded-[2rem] p-2 pr-2 flex items-end gap-2 shadow-inner border border-slate-100 focus-within:border-indigo-200 focus-within:ring-4 focus-within:ring-indigo-50/50 transition-all">
-
-
                             <textarea
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                placeholder="Ask about your horoscope..."
+                                placeholder={primaryProfile ? `Ask about ${primaryProfile.name}'s chart...` : "Ask a question..."}
                                 className="flex-1 bg-transparent border-none focus:ring-0 text-sm sm:text-base text-slate-900 placeholder:text-slate-400 min-h-[44px] max-h-[120px] py-2.5 px-2 resize-none"
                                 rows={1}
                                 onKeyDown={(e) => {
@@ -317,14 +752,14 @@ export default function ChatPage() {
 
                             <button
                                 onClick={() => handleSend()}
-                                disabled={!input.trim()}
+                                disabled={!input.trim() || isTyping}
                                 className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-indigo-600 flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 mb-0.5 shadow-lg shadow-indigo-500/20"
                             >
                                 <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
                             </button>
                         </div>
                         <p className="text-center text-[9px] sm:text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-widest">
-                            AI Astrologer can make mistakes.
+                            AI Astrology predictions are for guidance only.
                         </p>
                     </div>
                 </div>

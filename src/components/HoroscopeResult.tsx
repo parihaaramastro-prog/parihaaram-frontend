@@ -341,6 +341,19 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                     )}
                 </div>
 
+                {/* Dasha Timeline */}
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                        <h3 className="text-lg font-bold text-slate-900 uppercase tracking-wide">{t.periods}</h3>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Vimshottari Dasha</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {results.mahadashas.map((m, i) => (
+                            <MahadashaNode key={m.planet + i} m={m} language={language} />
+                        ))}
+                    </div>
+                </div>
+
                 {/* AI Astrologer Feature */}
                 <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-2xl p-8 shadow-lg text-white space-y-6 relative overflow-hidden group max-w-2xl mx-auto text-center">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 blur-[50px] rounded-full group-hover:bg-indigo-500/30 transition-all" />
