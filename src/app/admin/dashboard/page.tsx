@@ -16,7 +16,7 @@ export default function AdminDashboard() {
     const [astrologers, setAstrologers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ total: 0, pending: 0, complete: 0 });
-    const [activeTab, setActiveTab] = useState<'consultations' | 'staff'>('consultations');
+    const [activeTab, setActiveTab] = useState<'consultations' | 'staff' | 'settings'>('consultations');
 
     // Add Staff State
     const [searchEmail, setSearchEmail] = useState("");
@@ -26,6 +26,9 @@ export default function AdminDashboard() {
     const [addingStaff, setAddingStaff] = useState(false);
     const [addError, setAddError] = useState<string | null>(null);
     const [addSuccess, setAddSuccess] = useState<string | null>(null);
+
+    // Settings State
+    const [razorpayEnabled, setRazorpayEnabled] = useState(false);
 
     // Review State
     const [selectedReview, setSelectedReview] = useState<any | null>(null);
@@ -60,7 +63,15 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         fetchData();
+        const stored = localStorage.getItem('razorpay_enabled');
+        setRazorpayEnabled(stored === 'true');
     }, []);
+
+    const toggleRazorpay = () => {
+        const newState = !razorpayEnabled;
+        setRazorpayEnabled(newState);
+        localStorage.setItem('razorpay_enabled', String(newState));
+    };
 
     const handleAssign = async (consultationId: string, astrologerId: string) => {
         try {
@@ -190,6 +201,12 @@ export default function AdminDashboard() {
                         >
                             Staff Management
                         </button>
+                        <button
+                            onClick={() => setActiveTab('settings')}
+                            className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            Settings
+                        </button>
                     </div>
 
                     <div className="grid grid-cols-3 gap-3">
@@ -201,7 +218,7 @@ export default function AdminDashboard() {
 
                 {/* Operations Grid */}
                 <AnimatePresence mode="wait">
-                    {activeTab === 'consultations' ? (
+                    {activeTab === 'consultations' && (
                         <motion.div
                             key="consultations"
                             initial={{ opacity: 0, y: 10 }}
@@ -261,9 +278,9 @@ export default function AdminDashboard() {
                                                     </td>
                                                     <td className="px-8 py-6">
                                                         <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${c.status === 'completed' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
-                                                                c.status === 'pending_admin' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
-                                                                    c.status === 'reviewing' ? 'bg-blue-50 border-blue-100 text-blue-600' :
-                                                                        'bg-amber-50 border-amber-100 text-amber-600'
+                                                            c.status === 'pending_admin' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
+                                                                c.status === 'reviewing' ? 'bg-blue-50 border-blue-100 text-blue-600' :
+                                                                    'bg-amber-50 border-amber-100 text-amber-600'
                                                             }`}>
                                                             {c.status === 'completed' ? 'Published' :
                                                                 c.status === 'pending_admin' ? 'Review Required' :
@@ -305,7 +322,9 @@ export default function AdminDashboard() {
                                 </div>
                             )}
                         </motion.div>
-                    ) : (
+                    )}
+
+                    {activeTab === 'staff' && (
                         <motion.div
                             key="staff"
                             initial={{ opacity: 0, y: 10 }}
@@ -411,6 +430,52 @@ export default function AdminDashboard() {
                                         >
                                             {addingStaff ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                                             Authorize Consultant
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {activeTab === 'settings' && (
+                        <motion.div
+                            key="settings"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-6"
+                        >
+                            <div className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden max-w-2xl">
+                                <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-sm">
+                                            <Settings className="w-5 h-5 text-indigo-900" />
+                                        </div>
+                                        <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">System Configuration</h2>
+                                    </div>
+                                </div>
+                                <div className="p-8">
+                                    <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <h3 className="text-sm font-bold text-indigo-900">Razorpay Live Payments</h3>
+                                            <p className="text-xs font-medium text-indigo-600/80 max-w-md">
+                                                Enable to process real transactions via Razorpay. Disable to use Payment Simulation Mode for testing (free credits).
+                                            </p>
+                                            <div className="pt-2">
+                                                <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md ${razorpayEnabled ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                    Current Mode: {razorpayEnabled ? 'Live & Charging' : 'Simulation & Free'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={toggleRazorpay}
+                                            className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${razorpayEnabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                                        >
+                                            <span className="sr-only">Use setting</span>
+                                            <span
+                                                aria-hidden="true"
+                                                className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${razorpayEnabled ? 'translate-x-6' : 'translate-x-0'}`}
+                                            />
                                         </button>
                                     </div>
                                 </div>
