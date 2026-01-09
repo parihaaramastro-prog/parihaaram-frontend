@@ -29,6 +29,8 @@ export default function AdminDashboard() {
 
     // Settings State
     const [razorpayEnabled, setRazorpayEnabled] = useState(false);
+    const [packPrice, setPackPrice] = useState(49);
+    const [packCredits, setPackCredits] = useState(10);
 
     // Review State
     const [selectedReview, setSelectedReview] = useState<any | null>(null);
@@ -65,12 +67,24 @@ export default function AdminDashboard() {
         fetchData();
         const stored = localStorage.getItem('razorpay_enabled');
         setRazorpayEnabled(stored === 'true');
+
+        const storedPrice = localStorage.getItem('pack_price');
+        if (storedPrice) setPackPrice(parseInt(storedPrice));
+
+        const storedCredits = localStorage.getItem('pack_credits');
+        if (storedCredits) setPackCredits(parseInt(storedCredits));
     }, []);
 
     const toggleRazorpay = () => {
         const newState = !razorpayEnabled;
         setRazorpayEnabled(newState);
         localStorage.setItem('razorpay_enabled', String(newState));
+    };
+
+    const savePricing = () => {
+        localStorage.setItem('pack_price', packPrice.toString());
+        localStorage.setItem('pack_credits', packCredits.toString());
+        alert("Pricing configuration updated.");
     };
 
     const handleAssign = async (consultationId: string, astrologerId: string) => {
@@ -476,6 +490,41 @@ export default function AdminDashboard() {
                                                 aria-hidden="true"
                                                 className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${razorpayEnabled ? 'translate-x-6' : 'translate-x-0'}`}
                                             />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="p-8 border-t border-slate-100">
+                                    <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-6 w-full lg:w-1/2">
+                                        <div className="space-y-1">
+                                            <h3 className="text-sm font-bold text-slate-900">Standard Pack Pricing</h3>
+                                            <p className="text-xs font-medium text-slate-500">Configure the cost and credit value for the standard recharge pack.</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Price (₹)</label>
+                                                <input
+                                                    type="number"
+                                                    value={packPrice}
+                                                    onChange={(e) => setPackPrice(Number(e.target.value))}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold focus:border-indigo-600 transition-all outline-none"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Credits</label>
+                                                <input
+                                                    type="number"
+                                                    value={packCredits}
+                                                    onChange={(e) => setPackCredits(Number(e.target.value))}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold focus:border-indigo-600 transition-all outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={savePricing}
+                                            className="bg-slate-900 text-white py-4 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-indigo-500/10 active:scale-95"
+                                        >
+                                            Update Pricing
                                         </button>
                                     </div>
                                 </div>

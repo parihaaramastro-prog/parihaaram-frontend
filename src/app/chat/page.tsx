@@ -12,6 +12,7 @@ import Link from "next/link";
 import { SavedHoroscope, horoscopeService } from "@/lib/services/horoscope";
 import { aiService, ChatIntent } from "@/lib/services/ai";
 import { creditService } from "@/lib/services/credits";
+import { createClient } from "@/lib/supabase";
 import { loadRazorpay } from "@/lib/loadRazorpay";
 import ProfileSelectionModal from "@/components/ProfileSelectionModal";
 import ReactMarkdown from 'react-markdown';
@@ -41,6 +42,10 @@ function ChatContent() {
     const [input, setInput] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [isMobile, setIsMobile] = useState(false);
+
+    // User State
+    const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [packConfig, setPackConfig] = useState({ price: 49, credits: 10 });
 
     // Auto-Start Check
     useEffect(() => {
@@ -120,6 +125,25 @@ function ChatContent() {
             setCredits(c);
         };
         fetchCredits();
+    }, []);
+
+    // Fetch User Email & Pack Config
+    useEffect(() => {
+        const fetchUser = async () => {
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.email) {
+                setUserEmail(user.email);
+            }
+        };
+        fetchUser();
+
+        // Load Pack Config (Local Simulation for now as per requests)
+        const storedPrice = localStorage.getItem('pack_price');
+        const storedCredits = localStorage.getItem('pack_credits');
+        if (storedPrice && storedCredits) {
+            setPackConfig({ price: parseInt(storedPrice), credits: parseInt(storedCredits) });
+        }
     }, []);
 
     const getCurrentChat = () => chats.find(c => c.id === currentChatId);
@@ -451,7 +475,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
 
                                 <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-6">
                                     <div className="text-sm font-bold text-indigo-900 uppercase tracking-wider mb-1">Standard Pack</div>
-                                    <div className="text-3xl font-bold text-indigo-600">₹49 <span className="text-sm font-medium text-indigo-400">/ 10 msgs</span></div>
+                                    <div className="text-3xl font-bold text-indigo-600">₹{packConfig.price} <span className="text-sm font-medium text-indigo-400">/ {packConfig.credits} msgs</span></div>
                                 </div>
 
                                 <button
@@ -461,9 +485,9 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
 
                                         if (!isRazorpayEnabled) {
                                             // SIMULATION MODE
-                                            const success = await creditService.topUpCredits(10);
+                                            const success = await creditService.topUpCredits(packConfig.credits);
                                             if (success) {
-                                                setCredits(prev => (prev || 0) + 10);
+                                                setCredits(prev => (prev || 0) + packConfig.credits);
                                                 setPaymentSuccess(true);
 
                                                 // If we were effectively out of credits (blocked), clean up the error message
@@ -497,7 +521,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                         // Create Order
                                         const orderRes = await fetch('/api/create-order', {
                                             method: 'POST',
-                                            body: JSON.stringify({ amount: 4900 }), // ₹49.00
+                                            body: JSON.stringify({ amount: packConfig.price * 100 }), // In paise
                                         });
                                         const orderData = await orderRes.json();
 
@@ -511,7 +535,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                             amount: orderData.amount,
                                             currency: orderData.currency,
                                             name: "Parihaaram AI",
-                                            description: "10 Credit Pack",
+                                            description: `${packConfig.credits} Credit Pack`,
                                             order_id: orderData.id,
                                             handler: async function (response: any) {
                                                 // Verify Payment
@@ -527,9 +551,9 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
 
                                                 if (verifyRes.ok) {
                                                     // Payment Verified, Add Credits
-                                                    const success = await creditService.topUpCredits(10);
+                                                    const success = await creditService.topUpCredits(packConfig.credits);
                                                     if (success) {
-                                                        setCredits(prev => (prev || 0) + 10);
+                                                        setCredits(prev => (prev || 0) + packConfig.credits);
                                                         setPaymentSuccess(true);
 
                                                         // Clean up error message
@@ -553,7 +577,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                             },
                                             prefill: {
                                                 name: primaryProfile?.name || "User",
-                                                // email: "user@example.com", // Optional
+                                                email: userEmail || undefined,
                                             },
                                             theme: {
                                                 color: "#4f46e5",
@@ -565,7 +589,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                     }}
                                     className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-indigo-500/30"
                                 >
-                                    {(credits ?? 0) <= 0 ? "Pay ₹49 to Continue" : "Add 10 Credits (₹49)"}
+                                    {(credits ?? 0) <= 0 ? `Pay ₹${packConfig.price} to Continue` : `Add ${packConfig.credits} Credits (₹${packConfig.price})`}
                                 </button>
                                 <button
                                     onClick={() => setShowPayModal(false)}
@@ -621,7 +645,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
 
                     <div className="p-3">
                         <button
-                            onClick={createNewChat}
+                            onClick={() => createNewChat()}
                             className="w-full flex items-center justify-center gap-2 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 hover:border-indigo-300 px-4 py-3 rounded-xl text-sm font-bold transition-all shadow-sm group"
                         >
                             <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
