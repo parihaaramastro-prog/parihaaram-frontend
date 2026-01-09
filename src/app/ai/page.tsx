@@ -51,6 +51,19 @@ export default function AIAstrologerLanding() {
     // Listen for Auth Changes + Pending Data
     useEffect(() => {
         const supabase = createClient();
+
+        // Check already logged in
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                // If we are already logged in, we check if there's pending data (unlikely if they just landed, but possible if they refreshed during flow)
+                // If plain navigation, redirect to chat
+                const pending = localStorage.getItem('pending_ai_onboarding');
+                if (!pending) {
+                    router.replace('/chat');
+                }
+            }
+        });
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session?.user) {
                 const pending = localStorage.getItem('pending_ai_onboarding');
@@ -61,7 +74,12 @@ export default function AIAstrologerLanding() {
                         localStorage.removeItem('pending_ai_onboarding');
                     } catch (e) {
                         console.error("Error processing pending AI onboarding:", e);
+                        // If error, maybe still redirect?
+                        router.replace('/chat');
                     }
+                } else {
+                    // Logged in but no pending data (e.g. they just logged in via navbar)
+                    router.replace('/chat');
                 }
             }
         });

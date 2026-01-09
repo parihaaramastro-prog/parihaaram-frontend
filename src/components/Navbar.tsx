@@ -80,7 +80,7 @@ export default function Navbar() {
             { id: 'dashboard', label: 'Dashboard', icon: Compass, href: '/dashboard' },
             { id: 'expertise', label: 'Consult', icon: Sparkles, href: '/consultation' },
             { id: 'history', label: 'Readings', icon: History, href: '/consultation/history' },
-            { id: 'chat', label: 'AI Astrologer', icon: Bot, href: '/ai' },
+            { id: 'chat', label: 'AI Astrologer', icon: Bot, href: '/chat' },
         ],
     };
 

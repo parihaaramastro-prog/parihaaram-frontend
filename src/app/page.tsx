@@ -32,19 +32,17 @@ function HomeContent() {
 
         // Check session
         supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user);
+            if (session?.user) {
+                setUser(session.user);
+                router.replace('/dashboard');
+            }
         });
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             setUser(session?.user);
             if (session?.user) {
-                // Check if we have pending calculation
-                const pending = sessionStorage.getItem('pending_calculation');
-                if (pending) {
-                    // Redirect to dashboard to process it
-                    router.push('/dashboard');
-                }
+                router.replace('/dashboard');
             }
         });
 

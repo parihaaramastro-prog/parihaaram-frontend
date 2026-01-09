@@ -236,7 +236,7 @@ function DashboardContent() {
 
                                 {/* AI Astrologer */}
                                 <Link
-                                    href="/ai"
+                                    href="/chat"
                                     className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white p-4 rounded-2xl shadow-lg shadow-slate-900/20 text-center flex flex-col items-center justify-center gap-3 transition-all group hover:-translate-y-1 aspect-square sm:aspect-auto sm:h-full relative overflow-hidden"
                                 >
                                     <div className="absolute top-0 right-0 p-3 opacity-20 pointer-events-none">

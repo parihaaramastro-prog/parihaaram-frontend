@@ -89,12 +89,11 @@ function ChatContent() {
                 setChats(parsed);
                 // Set to most recent or first
                 setCurrentChatId(parsed[0].id);
-            } else {
-                createNewChat();
             }
-        } else {
-            createNewChat();
         }
+
+        // Removed auto-creation of chat for empty state
+        // logic moved to explicit user action
 
         const checkMobile = () => {
             const mobile = window.innerWidth < 1024; // lg breakpoint
@@ -125,9 +124,10 @@ function ChatContent() {
 
     const getCurrentChat = () => chats.find(c => c.id === currentChatId);
 
-    const createNewChat = () => {
+    const createNewChat = (initialMessage?: string) => {
+        const newId = Date.now().toString();
         const newChat: ChatSession = {
-            id: Date.now().toString(),
+            id: newId,
             title: "New Session",
             messages: [{
                 role: 'ai',
@@ -136,11 +136,16 @@ function ChatContent() {
             }],
             updatedAt: Date.now()
         };
+
+        // If initial message provided (from preset), add it immediately? 
+        // No, usually we want the AI greeting first.
+
         setChats(prev => [newChat, ...prev]);
-        setCurrentChatId(newChat.id);
+        setCurrentChatId(newId);
         setPrimaryProfile(null);
         setSecondaryProfile(null);
         if (isMobile) setIsSidebarOpen(false);
+        return newId;
     };
 
     const deleteChat = (e: React.MouseEvent, id: string) => {
@@ -237,38 +242,94 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
     };
 
     const handleSend = async (text: string = input, hidden: boolean = false, overrideParams?: { p1?: SavedHoroscope, p2?: SavedHoroscope }) => {
-        if (!text.trim() || !currentChatId) return;
+        if (!text.trim()) return;
+
+        let activeChatId = currentChatId;
+        let isNew = false;
+
+        // If no active chat, create one properly
+        if (!activeChatId) {
+            isNew = true;
+            activeChatId = Date.now().toString();
+            // We will add the chat to state WITH the user message in one go to avoid race conditions
+            // But we also need the initial AI greeting
+        }
 
         const timestamp = Date.now();
         const userMsg: Message = { role: 'user', content: text, timestamp, isHidden: hidden };
 
-        // Determine effective profiles (State might be stale in closures, so prefer overrides)
+        // Determine effective profiles
         const effectivePrimary = overrideParams?.p1 || primaryProfile;
         const effectiveSecondary = overrideParams?.p2 || secondaryProfile;
 
-        setChats(prev => prev.map(chat => {
-            if (chat.id === currentChatId) {
-                const updatedMessages = [...chat.messages, userMsg];
-                // Update title ONLY if visible message and first one
-                const title = (chat.messages.length === 0 && !hidden) ? text.slice(0, 30) + (text.length > 30 ? '...' : '') : chat.title;
-                return {
-                    ...chat,
-                    messages: updatedMessages,
-                    title,
-                    updatedAt: timestamp,
-                    primaryProfileId: effectivePrimary?.id,
-                    secondaryProfileId: effectiveSecondary?.id
-                };
-            }
-            return chat;
-        }));
+        if (isNew) {
+            const newChat: ChatSession = {
+                id: activeChatId!,
+                title: (!hidden) ? text.slice(0, 30) + (text.length > 30 ? '...' : '') : "New Session",
+                messages: [
+                    {
+                        role: 'ai',
+                        content: "Hello! I am Parihaaram AI. I can analyze birth charts and compatibility.\n\nTo begin, please tell me **which profile** you would like to analyze today?",
+                        timestamp: Date.now() - 100 // Slightly before
+                    },
+                    userMsg
+                ],
+                updatedAt: timestamp,
+                primaryProfileId: effectivePrimary?.id,
+                secondaryProfileId: effectiveSecondary?.id
+            };
+            setChats(prev => [newChat, ...prev]);
+            setCurrentChatId(activeChatId);
+            if (isMobile) setIsSidebarOpen(false);
+        } else {
+            setChats(prev => prev.map(chat => {
+                if (chat.id === activeChatId) {
+                    const updatedMessages = [...chat.messages, userMsg];
+                    // Update title ONLY if visible message and first one (technically 2nd if AI greeted)
+                    // But if AI greeted, length is 1.
+                    const title = (chat.messages.length <= 1 && !hidden) ? text.slice(0, 30) + (text.length > 30 ? '...' : '') : chat.title;
+                    return {
+                        ...chat,
+                        messages: updatedMessages,
+                        title,
+                        updatedAt: timestamp,
+                        primaryProfileId: effectivePrimary?.id,
+                        secondaryProfileId: effectiveSecondary?.id
+                    };
+                }
+                return chat;
+            }));
+        }
 
         if (!hidden) setInput("");
         setIsTyping(true);
 
         try {
             // Get current history for this chat
-            const currentHistory = getCurrentChat()?.messages || [];
+            // If new, history is just the greeting + user msg we just added
+            // But state might not match yet. So allow constructing history manually
+            let currentHistory: Message[] = [];
+            if (isNew) {
+                currentHistory = [
+                    {
+                        role: 'ai',
+                        content: "Hello! I am Parihaaram AI. I can analyze birth charts and compatibility.\n\nTo begin, please tell me **which profile** you would like to analyze today?",
+                        timestamp: Date.now() - 100
+                    },
+                    userMsg
+                ];
+            } else {
+                currentHistory = chats.find(c => c.id === activeChatId)?.messages || [];
+                // existing logic might read stale 'chats' from closure scope?
+                // 'chats' is in dependency array? handleSend isn't wrapped in useCallback directly here but defined in component.
+                // It reads current 'chats'.
+                // If we didn't use functional update above, it's fine.
+                // But we used setChats(prev => ...). 'chats' var in this scope is OLD.
+                // So we should append userMsg to 'chats.find(...)' manually for the API call.
+                if (currentHistory.length > 0) {
+                    currentHistory = [...currentHistory, userMsg];
+                }
+            }
 
             const response = await aiService.generateResponse(text, {
                 primaryProfile: effectivePrimary || undefined,
@@ -287,7 +348,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
             }
 
             setChats(prev => prev.map(chat => {
-                if (chat.id === currentChatId) {
+                if (chat.id === activeChatId) {
                     return { ...chat, messages: [...chat.messages, aiMsg] };
                 }
                 return chat;
@@ -303,7 +364,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                     timestamp: Date.now()
                 };
                 setChats(prev => prev.map(chat => {
-                    if (chat.id === currentChatId) {
+                    if (chat.id === activeChatId) {
                         return { ...chat, messages: [...chat.messages, systemMsg] };
                     }
                     return chat;
@@ -313,6 +374,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
             setIsTyping(false);
         }
     };
+
 
     const currentMessages = getCurrentChat()?.messages || [];
 
@@ -491,8 +553,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                             },
                                             prefill: {
                                                 name: primaryProfile?.name || "User",
-                                                email: "user@example.com", // Should get from Auth
-                                                contact: "9999999999",
+                                                // email: "user@example.com", // Optional
                                             },
                                             theme: {
                                                 color: "#4f46e5",
