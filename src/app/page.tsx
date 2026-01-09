@@ -142,6 +142,26 @@ function HomeContent() {
                                     ? 'பரிகாரம்: இந்தியாவின் முதல் துல்லியமான ஜோதிட தளம்.'
                                     : 'Pariharam provides accurate birth charts and personalized insights based on authentic Vedic principles.'}
                             </p>
+
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.2 }}
+                                className="flex justify-center pt-2"
+                            >
+                                <Link href="/ai" className="group relative inline-flex items-center gap-3 bg-slate-900 text-white pl-5 pr-4 py-3 rounded-full hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-500/20 overflow-hidden">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                    <div className="relative flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
+                                            <Sparkles className="w-4 h-4 text-indigo-300 group-hover:text-white transition-colors" />
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="text-[10px] font-bold text-indigo-300 group-hover:text-indigo-100 uppercase tracking-wider leading-none mb-0.5">New Feature</p>
+                                            <p className="text-sm font-bold leading-none">Ask AI Astrologer &rarr;</p>
+                                        </div>
+                                    </div>
+                                </Link>
+                            </motion.div>
                         </motion.div>
                     )}
 
@@ -247,7 +267,7 @@ function HomeContent() {
                     customTitle={authMode === 'signup' && hasPending ? "Unlock Your Free Birth Chart" : undefined}
                     customDescription={authMode === 'signup' && hasPending ? "Continue to get your free birth chart and know more about you in just 1 click." : undefined}
                 />
-            </main>
+            </main >
         </>
     );
 }

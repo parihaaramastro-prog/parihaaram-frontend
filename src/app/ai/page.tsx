@@ -9,6 +9,7 @@ import {
     Quote, Heart, Briefcase, Smile
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
+import { horoscopeService } from "@/lib/services/horoscope";
 import { profileService } from "@/lib/services/profile";
 import AuthModal from "@/components/AuthModal";
 import DivineDatePicker from "@/components/ui/DivineDatePicker";
@@ -45,6 +46,27 @@ export default function AIAstrologerLanding() {
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Listen for Auth Changes + Pending Data
+    useEffect(() => {
+        const supabase = createClient();
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (session?.user) {
+                const pending = localStorage.getItem('pending_ai_onboarding');
+                if (pending) {
+                    try {
+                        const data = JSON.parse(pending);
+                        await saveAndRedirect(session.user.id, data);
+                        localStorage.removeItem('pending_ai_onboarding');
+                    } catch (e) {
+                        console.error("Error processing pending AI onboarding:", e);
+                    }
+                }
+            }
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
     // City Search
@@ -90,6 +112,35 @@ export default function AIAstrologerLanding() {
         setSuggestions([]);
     };
 
+    const saveAndRedirect = async (userId: string, data: typeof formData) => {
+        // 1. Update User Profile
+        await profileService.updateProfile(userId, {
+            full_name: data.name,
+            birth_date: data.dob,
+            birth_time: data.tob,
+            birth_place: data.pob
+        });
+
+        // 2. Create Saved Horoscope (so it appears in chat selector)
+        if (data.lat && data.lon) {
+            try {
+                await horoscopeService.saveHoroscope({
+                    name: data.name,
+                    dob: data.dob,
+                    tob: data.tob,
+                    pob: data.pob,
+                    lat: data.lat,
+                    lon: data.lon
+                });
+            } catch (e) {
+                console.warn("Could not save horoscope entry:", e);
+                // Proceed anyway, profile is updated
+            }
+        }
+
+        router.push('/chat?new=true');
+    };
+
     const handleStart = async () => {
         setLoading(true);
         const supabase = createClient();
@@ -103,17 +154,10 @@ export default function AIAstrologerLanding() {
         }
 
         try {
-            await profileService.updateProfile(user.id, {
-                full_name: formData.name,
-                birth_date: formData.dob,
-                birth_time: formData.tob,
-                birth_place: formData.pob
-            });
-            router.push('/chat');
+            await saveAndRedirect(user.id, formData);
         } catch (error) {
             console.error("Error starting chat:", error);
             alert("Something went wrong. Please try again.");
-        } finally {
             setLoading(false);
         }
     };

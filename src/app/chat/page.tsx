@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import {
     Send, Bot, User, ArrowLeft, Globe,
     Lightbulb, MoreHorizontal, ArrowUp, Sidebar, CircleUser,
     Plus, MessageSquare, Trash2, X, Sparkles, Users, Briefcase, Heart, Activity, Coins, Check
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { SavedHoroscope } from "@/lib/services/horoscope";
+import { SavedHoroscope, horoscopeService } from "@/lib/services/horoscope";
 import { aiService, ChatIntent } from "@/lib/services/ai";
 import { creditService } from "@/lib/services/credits";
 import { loadRazorpay } from "@/lib/loadRazorpay";
@@ -32,14 +32,38 @@ interface ChatSession {
     secondaryProfileId?: string;
 }
 
-export default function ChatPage() {
+function ChatContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [chats, setChats] = useState<ChatSession[]>([]);
     const [currentChatId, setCurrentChatId] = useState<string | null>(null);
     const [input, setInput] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [isMobile, setIsMobile] = useState(false);
+
+    // Auto-Start Check
+    useEffect(() => {
+        const isNewUser = searchParams.get('new') === 'true';
+        if (isNewUser) {
+            // Give a small delay for local storage to be ready or just proceed
+            setTimeout(async () => {
+                try {
+                    const saved = await horoscopeService.getSavedHoroscopes();
+                    if (saved.length > 0) {
+                        const latest = saved[0];
+                        // Automatically select this profile
+                        handleProfileSelect(latest);
+
+                        // Clean URL
+                        router.replace('/chat');
+                    }
+                } catch (e) {
+                    console.error("Auto-start error:", e);
+                }
+            }, 500);
+        }
+    }, [searchParams]);
 
     // Context State
     const [primaryProfile, setPrimaryProfile] = useState<SavedHoroscope | null>(null);
@@ -642,7 +666,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                     </header>
 
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-100">
+                    <div className={`flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-100 ${(credits !== null && credits <= 0) ? 'blur-sm select-none pointer-events-none' : ''}`}>
                         {/* We use visibleMessages here instead of currentMessages to respect isHidden */}
                         {visibleMessages.length === 0 ? (
                             <div className="h-full flex flex-col justify-center items-center pb-20 text-center max-w-lg mx-auto px-4">
@@ -765,5 +789,21 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                 </div>
             </div>
         </main>
+    );
+
+}
+
+export default function ChatPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-white">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Loading AI...</p>
+                </div>
+            </div>
+        }>
+            <ChatContent />
+        </Suspense>
     );
 }
