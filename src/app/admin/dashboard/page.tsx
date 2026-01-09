@@ -6,12 +6,15 @@ import {
     Users, Settings, ShieldCheck, Grid,
     Database, Activity, Search, Filter,
     ArrowUpRight, Loader2, UserPlus, UserCheck, CheckCircle2, Clock,
-    Mail, Shield, Trash2, MoreVertical, Info, AlertTriangle, X, MessageSquare, Briefcase
+    Mail, Shield, Trash2, MoreVertical, Info, AlertTriangle, X, MessageSquare, Briefcase, LogOut
 } from "lucide-react";
+import { createClient } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 import { consultationService } from "@/lib/services/consultation";
 import { profileService, User } from "@/lib/services/profile";
 
 export default function AdminDashboard() {
+    const router = useRouter();
     const [consultations, setConsultations] = useState<any[]>([]);
     const [astrologers, setAstrologers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
@@ -188,6 +191,12 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleLogout = async () => {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push('/');
+    };
+
     return (
         <main className="min-h-screen bg-slate-50 pt-32 pb-40 px-6">
             <div className="max-w-[1600px] mx-auto space-y-10">
@@ -220,6 +229,14 @@ export default function AdminDashboard() {
                             className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             Settings
+                        </button>
+                        <div className="w-px h-6 bg-slate-200 mx-1 self-center" />
+                        <button
+                            onClick={handleLogout}
+                            className="px-4 py-2 text-slate-400 hover:text-rose-500 transition-colors flex items-center"
+                            title="Sign Out"
+                        >
+                            <LogOut className="w-4 h-4" />
                         </button>
                     </div>
 

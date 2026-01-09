@@ -603,7 +603,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                 </div>
             )}
 
-            <div className="flex-1 w-full max-w-[1400px] mx-auto flex relative overflow-hidden bg-white md:shadow-2xl md:ring-1 md:ring-slate-900/5 md:my-6 md:rounded-[2.5rem] md:h-[calc(100%-3rem)]">
+            <div className="flex-1 w-full max-w-[1400px] mx-auto flex relative overflow-hidden bg-white border border-indigo-500/30 md:border-0 md:shadow-2xl md:ring-1 md:ring-slate-900/5 md:my-6 md:rounded-[2.5rem] md:h-[calc(100%-3rem)]">
 
                 {/* Mobile Overlay Backdrop */}
                 <AnimatePresence>
@@ -702,20 +702,20 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                             </div>
 
                             {/* Credits & End Chat Actions */}
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 sm:gap-3">
                                 <button
                                     onClick={() => setShowPayModal(true)}
-                                    className="hidden sm:flex items-center gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+                                    className="flex items-center gap-1.5 sm:gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
                                 >
-                                    <Coins className="w-4 h-4" />
-                                    <span>{credits !== null ? credits : '-'} Credits</span>
+                                    <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    <span>{credits !== null ? credits : '-'} <span className="hidden sm:inline">Credits</span></span>
                                 </button>
 
                                 <button
                                     onClick={() => router.push('/dashboard')}
-                                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors"
+                                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 sm:px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap"
                                 >
-                                    End Chat
+                                    End <span className="hidden sm:inline">Chat</span>
                                 </button>
                             </div>
                         </div>

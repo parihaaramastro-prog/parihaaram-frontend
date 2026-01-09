@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     LayoutDashboard, Briefcase, Clock, CheckCircle2,
     ArrowRight, Loader2, Sparkles, User, Mail, Calendar,
-    MapPin, MessageSquare, AlertCircle, Heart, Activity, DollarSign, X, ArrowLeft, History
+    MapPin, MessageSquare, AlertCircle, Heart, Activity, DollarSign, X, ArrowLeft, History, LogOut
 } from "lucide-react";
 import { consultationService, ConsultationRequest } from "@/lib/services/consultation";
 import { createClient } from "@/lib/supabase";
@@ -78,6 +78,12 @@ export default function AstrologerDashboard() {
         fetchAstrology();
     }, [selectedTask]);
 
+    const handleLogout = async () => {
+        const supabase = createClient();
+        await supabase.auth.signOut();
+        router.push('/');
+    };
+
     const handleOpenTask = (task: ConsultationRequest) => {
         setSelectedTask(task);
         setReportContent(task.report_content || "");
@@ -123,6 +129,13 @@ export default function AstrologerDashboard() {
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Queue Status</p>
                                         <p className="text-xl font-bold text-slate-900">{tasks.length} Jobs Active</p>
                                     </div>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"
+                                        title="Sign Out"
+                                    >
+                                        <LogOut className="w-5 h-5" />
+                                    </button>
                                 </div>
                             </div>
 
@@ -142,8 +155,8 @@ export default function AstrologerDashboard() {
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className={`px-4 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${task.status === 'completed' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
-                                                        task.status === 'pending_admin' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
-                                                            'bg-amber-50 border-amber-100 text-amber-600'
+                                                    task.status === 'pending_admin' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
+                                                        'bg-amber-50 border-amber-100 text-amber-600'
                                                     }`}>
                                                     {task.status === 'completed' ? 'Published' :
                                                         task.status === 'pending_admin' ? 'Awaiting Admin' :
