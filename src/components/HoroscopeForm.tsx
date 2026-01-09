@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Calendar, Clock, MapPin, Sparkles, User, Loader2 } from "lucide-react";
+import DivineDatePicker from "@/components/ui/DivineDatePicker";
 
 interface HoroscopeFormProps {
     onCalculate: (data: { name: string; dob: string; tob: string; pob: string; lat?: number; lon?: number }) => void;
@@ -153,17 +154,10 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                     <div className="w-full">
                         <label className="divine-label">{t.dob}</label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center pointer-events-none">
-                                <Calendar className="w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
-                            </div>
-                            <input
-                                type="date"
-                                className="divine-input !pl-14"
-                                value={formData.dob}
-                                onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                            />
-                        </div>
+                        <DivineDatePicker
+                            value={formData.dob}
+                            onChange={(date) => setFormData({ ...formData, dob: date })}
+                        />
                     </div>
 
                     <div className="w-full">
