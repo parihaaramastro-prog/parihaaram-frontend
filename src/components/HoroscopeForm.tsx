@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Calendar, Clock, MapPin, Sparkles, User, Loader2 } from "lucide-react";
 import DivineDatePicker from "@/components/ui/DivineDatePicker";
+import DivineTimePicker from "@/components/ui/DivineTimePicker";
 
 interface HoroscopeFormProps {
     onCalculate: (data: { name: string; dob: string; tob: string; pob: string; lat?: number; lon?: number }) => void;

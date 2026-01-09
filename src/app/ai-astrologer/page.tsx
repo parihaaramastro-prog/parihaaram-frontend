@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase";
 import { profileService } from "@/lib/services/profile";
 import AuthModal from "@/components/AuthModal";
 import DivineDatePicker from "@/components/ui/DivineDatePicker";
+import DivineTimePicker from "@/components/ui/DivineTimePicker";
 
 export default function AIAstrologerLanding() {
     const router = useRouter();
@@ -201,17 +202,12 @@ export default function AIAstrologerLanding() {
                                             />
                                         </div>
 
-                                        <div className="space-y-1.5">
-                                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Birth Time</label>
-                                            <div className="relative">
-                                                <Clock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                                                <input
-                                                    type="time"
-                                                    value={formData.tob}
-                                                    onChange={(e) => setFormData({ ...formData, tob: e.target.value })}
-                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3.5 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all"
-                                                />
-                                            </div>
+                                        <div className="md:col-span-2">
+                                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-1.5 block">Birth Time</label>
+                                            <DivineTimePicker
+                                                value={formData.tob}
+                                                onChange={(time) => setFormData({ ...formData, tob: time })}
+                                            />
                                         </div>
                                     </div>
 
