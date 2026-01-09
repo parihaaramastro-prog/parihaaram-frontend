@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import Image from "next/image";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { Sparkles, Calendar, Clock, MapPin, ArrowRight, Star } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+    Sparkles, Calendar, Clock, MapPin, ArrowRight, Star,
+    ShieldCheck, Zap, Users, Loader2, MessageCircle,
+    Quote, Heart, Briefcase, Smile
+} from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { profileService } from "@/lib/services/profile";
 import AuthModal from "@/components/AuthModal";
@@ -12,15 +15,78 @@ import AuthModal from "@/components/AuthModal";
 export default function AIAstrologerLanding() {
     const router = useRouter();
     const [isAuthOpen, setIsAuthOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState({
         name: "",
         dob: "",
         tob: "",
-        pob: ""
+        pob: "",
+        lat: undefined as number | undefined,
+        lon: undefined as number | undefined
     });
+
+    // Autocomplete State
+    const [suggestions, setSuggestions] = useState<any[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+    const suggestionsRef = useRef<HTMLDivElement>(null);
+    const [loading, setLoading] = useState(false);
+
+    // Click outside handler for suggestions
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node)) {
+                setShowSuggestions(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // City Search
+    const fetchSuggestions = async (query: string) => {
+        if (!query || query.length < 3) {
+            setSuggestions([]);
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`
+            );
+            const data = await response.json();
+            setSuggestions(data || []);
+            setShowSuggestions(true);
+        } catch (error) {
+            console.error("Error fetching places:", error);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handlePobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setFormData(prev => ({ ...prev, pob: value, lat: undefined, lon: undefined }));
+
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        debounceTimer.current = setTimeout(() => {
+            fetchSuggestions(value);
+        }, 500);
+    };
+
+    const selectPlace = (place: any) => {
+        setFormData(prev => ({
+            ...prev,
+            pob: place.display_name,
+            lat: parseFloat(place.lat),
+            lon: parseFloat(place.lon)
+        }));
+        setShowSuggestions(false);
+        setSuggestions([]);
+    };
 
     const handleStart = async () => {
         setLoading(true);
@@ -28,26 +94,19 @@ export default function AIAstrologerLanding() {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
-            // If not logged in, open Auth Modal
-            // We save form data to local storage to hydrate later if needed, 
-            // or we can pass it to the profile service once logged in.
-            // For now, let's just trigger auth.
             localStorage.setItem('pending_ai_onboarding', JSON.stringify(formData));
             setIsAuthOpen(true);
             setLoading(false);
             return;
         }
 
-        // If logged in, update profile and redirect
         try {
-            if (formData.name && formData.dob && formData.tob && formData.pob) {
-                await profileService.updateProfile(user.id, {
-                    full_name: formData.name,
-                    birth_date: formData.dob,
-                    birth_time: formData.tob,
-                    birth_place: formData.pob
-                });
-            }
+            await profileService.updateProfile(user.id, {
+                full_name: formData.name,
+                birth_date: formData.dob,
+                birth_time: formData.tob,
+                birth_place: formData.pob
+            });
             router.push('/chat');
         } catch (error) {
             console.error("Error starting chat:", error);
@@ -58,169 +117,218 @@ export default function AIAstrologerLanding() {
     };
 
     return (
-        <main className="min-h-screen bg-[#030014] text-white relative overflow-hidden">
+        <main className="min-h-screen bg-gradient-to-b from-white to-slate-50 relative overflow-hidden font-sans">
 
-            {/* Background Effects */}
-            <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#030014] via-transparent to-transparent" />
+            {/* Background Decoration */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-50/50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-50/50 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
 
-            <div className="container mx-auto px-6 pt-32 pb-20 relative z-10">
-                <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div className="relative pt-5 pb-20 px-4 md:px-6">
+                <div className="max-w-7xl mx-auto space-y-24">
 
-                    {/* Left: Content */}
-                    <div className="space-y-8">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-widest">
-                            <Sparkles className="w-3 h-3" />
-                            <span>AI-Powered Vedic Precision</span>
-                        </div>
+                    {/* Hero Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+                        <div className="space-y-8">
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-600/5 border border-indigo-600/10 text-indigo-700 text-xs font-bold uppercase tracking-widest"
+                            >
+                                <Sparkles className="w-3.5 h-3.5 fill-indigo-700" />
+                                <span>AI Vedic Astrologer</span>
+                            </motion.div>
 
-                        <h1 className="text-5xl md:text-6xl font-bold tracking-tighter leading-tight">
-                            Decode Your Destiny with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">AI Astrology</span>
-                        </h1>
+                            <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tighter leading-[0.95]">
+                                Clarity needed? <br />
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Ask the AI.</span>
+                            </h1>
 
-                        <p className="text-slate-400 text-lg leading-relaxed max-w-lg">
-                            Get instant, personalized answers to your life's deepest questions. Our AI analyzes your birth chart with Vedic precision to provide accurate guidance.
-                        </p>
+                            <p className="text-slate-600 text-lg md:text-xl font-medium leading-relaxed max-w-lg">
+                                Experience the world's most advanced Vedic astrology AI. It calculates your birth chart in milliseconds to give you hyper-personalized answers about career, love, and life.
+                            </p>
 
-                        <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                                <CheckIcon /> <span>Birth Chart Analysis</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                                <CheckIcon /> <span>Predictive Insights</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-300">
-                                <CheckIcon /> <span>Relationship Compatibility</span>
-                            </div>
-                        </div>
-
-                        <div className="p-6 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-sm space-y-4 shadow-2xl">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-bold text-white">Start Your Free Session</h3>
-                                <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-widest rounded-md border border-emerald-500/20">3 Credits Free</span>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Name</label>
-                                    <input
-                                        type="text"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full bg-[#0a0a20] border border-slate-700/50 rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-colors outline-none"
-                                        placeholder="Your Name"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Birth Date</label>
-                                    <div className="relative">
-                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                                        <input
-                                            type="date"
-                                            value={formData.dob}
-                                            onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
-                                            className="w-full bg-[#0a0a20] border border-slate-700/50 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:border-indigo-500 transition-colors outline-none"
-                                        />
+                            {/* Social Proof - Moved Up */}
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="flex -space-x-3">
+                                        {['Priya', 'Raj', 'Amit', 'Sneha'].map((seed, i) => (
+                                            <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center overflow-hidden">
+                                                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`} alt="User" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="text-sm font-bold text-slate-700">
+                                        Over <span className="text-emerald-600">50,000+</span> people trust us
                                     </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Birth Time</label>
-                                    <div className="relative">
-                                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                                        <input
-                                            type="time"
-                                            value={formData.tob}
-                                            onChange={(e) => setFormData({ ...formData, tob: e.target.value })}
-                                            className="w-full bg-[#0a0a20] border border-slate-700/50 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:border-indigo-500 transition-colors outline-none"
-                                        />
+                                <div className="flex items-center gap-2 text-amber-500">
+                                    <div className="flex gap-0.5">
+                                        {[1, 2, 3, 4, 5].map(i => <Star key={i} className="w-4 h-4 fill-current" />)}
                                     </div>
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">4.9/5 Rating</span>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Birth Place</label>
-                                    <div className="relative">
-                                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                            </div>
+                        </div>
+
+                        {/* Interactive Form Card */}
+                        <div className="bg-white rounded-[2.5rem] p-8 md:p-10 border border-slate-200 shadow-2xl shadow-indigo-500/10 relative group hover:border-indigo-500/20 transition-all z-20">
+                            <div className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-bold px-6 py-2 rounded-bl-2xl uppercase tracking-widest z-10 shadow-lg">
+                                Try It Free
+                            </div>
+
+                            <div className="relative z-10 space-y-8">
+                                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Unlock Your Reading</h3>
+
+                                <div className="space-y-5">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Name</label>
                                         <input
                                             type="text"
-                                            value={formData.pob}
-                                            onChange={(e) => setFormData({ ...formData, pob: e.target.value })}
-                                            className="w-full bg-[#0a0a20] border border-slate-700/50 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:border-indigo-500 transition-colors outline-none"
-                                            placeholder="City, Country"
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all placeholder:font-medium placeholder:text-slate-400"
+                                            placeholder="Enter your full name"
                                         />
                                     </div>
-                                </div>
-                            </div>
 
-                            <button
-                                onClick={handleStart}
-                                disabled={!formData.name || !formData.dob || !formData.tob || !formData.pob || loading}
-                                className="w-full py-4 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white rounded-xl text-sm font-bold uppercase tracking-widest shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group"
-                            >
-                                {loading ? "Analyzing..." : "Reveal Your Future"}
-                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                            </button>
-                            <p className="text-center text-[10px] text-slate-500">By continuing, you agree to our Terms & Privacy Policy.</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Birth Date</label>
+                                            <div className="relative">
+                                                <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                                <input
+                                                    type="date"
+                                                    value={formData.dob}
+                                                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3.5 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all uppercase"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Birth Time</label>
+                                            <div className="relative">
+                                                <Clock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                                <input
+                                                    type="time"
+                                                    value={formData.tob}
+                                                    onChange={(e) => setFormData({ ...formData, tob: e.target.value })}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3.5 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5 relative" ref={suggestionsRef}>
+                                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Place of Birth</label>
+                                        <div className="relative">
+                                            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center pointer-events-none">
+                                                {isSearching ? <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" /> : <MapPin className="w-4 h-4 text-slate-400" />}
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={formData.pob}
+                                                onChange={handlePobChange}
+                                                className={`w-full bg-slate-50 border rounded-xl pl-10 pr-4 py-3.5 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all placeholder:font-medium placeholder:text-slate-400 ${formData.pob && !formData.lat ? 'border-amber-300' : 'border-slate-200'}`}
+                                                placeholder="Search city..."
+                                                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                                            />
+                                        </div>
+
+                                        {/* Autocomplete Dropdown */}
+                                        <AnimatePresence>
+                                            {showSuggestions && suggestions.length > 0 && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                    className="absolute z-50 left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto"
+                                                >
+                                                    {suggestions.map((place, index) => (
+                                                        <button
+                                                            key={index}
+                                                            onClick={() => selectPlace(place)}
+                                                            className="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-50 last:border-0 transition-colors flex items-start gap-3"
+                                                        >
+                                                            <MapPin className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" />
+                                                            <span className="truncate">{place.display_name}</span>
+                                                        </button>
+                                                    ))}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+
+                                        {formData.pob && !formData.lat && (
+                                            <p className="text-[10px] text-amber-600 font-bold mt-1 ml-1 flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                                Please select a valid city from the list
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleStart}
+                                    disabled={!formData.name || !formData.dob || !formData.tob || !formData.lat || loading}
+                                    className="w-full py-4 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold uppercase tracking-widest shadow-xl hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group active:scale-95"
+                                >
+                                    {loading ? "Analyzing Chart..." : "Get My Free Prediction"}
+                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </button>
+
+                                <p className="text-center text-[10px] text-slate-400 font-medium">
+                                    By proceeding, you agree to our Terms. Your data is private.
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Right: Visual */}
-                    <div className="relative hidden lg:block">
-                        <div className="absolute -inset-4 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" />
-                        <div className="relative bg-[#0a0a20] border border-slate-700/50 rounded-[2.5rem] p-4 shadow-2xl">
-                            <div className="absolute top-8 left-8 right-8 bottom-8 rounded-2xl overflow-hidden border border-slate-700/30">
-                                {/* Chat Mockup */}
-                                <div className="h-full bg-[#030014] p-6 space-y-6">
-                                    <div className="flex gap-4">
-                                        <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
-                                            <Sparkles className="w-4 h-4 text-white" />
-                                        </div>
-                                        <div className="flex-1 bg-white/5 rounded-2xl rounded-tl-none p-4 text-sm text-slate-300 leading-relaxed border border-white/5">
-                                            <p>Based on your chart, your moon sign indicates a period of significant career growth starting next month. The alignment of Jupiter suggests new opportunities in leadership roles.</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-4 flex-row-reverse">
-                                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
-                                            <span className="text-xs font-bold">YO</span>
-                                        </div>
-                                        <div className="bg-indigo-600/20 rounded-2xl rounded-tr-none p-4 text-sm text-white border border-indigo-500/20">
-                                            <p>What should I focus on to maximize this growth?</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-4">
-                                        <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
-                                            <Sparkles className="w-4 h-4 text-white" />
-                                        </div>
-                                        <div className="flex-1 bg-white/5 rounded-2xl rounded-tl-none p-4 space-y-2 border border-white/5">
-                                            <div className="w-3/4 h-2 bg-slate-700/50 rounded-full" />
-                                            <div className="w-1/2 h-2 bg-slate-700/50 rounded-full" />
-                                            <div className="w-5/6 h-2 bg-slate-700/50 rounded-full" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                    {/* Sample Questions Section - New */}
+                    <div className="space-y-10">
+                        <div className="text-center max-w-2xl mx-auto space-y-4">
+                            <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Capabilities</span>
+                            <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight">What can you ask?</h2>
+                            <p className="text-slate-500 font-medium">Our AI understands your unique planetary positions. Ask specific questions and get detailed, chart-based answers.</p>
+                        </div>
 
-                            {/* Floating Elements */}
-                            <motion.div
-                                animate={{ y: [0, -10, 0] }}
-                                transition={{ repeat: Infinity, duration: 4 }}
-                                className="absolute -bottom-8 -left-8 bg-[#0f0f29] p-4 rounded-2xl border border-slate-700/50 shadow-xl flex items-center gap-3"
-                            >
-                                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500">
-                                    <Star className="w-5 h-5 fill-amber-500" />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Prediction Accuracy</p>
-                                    <p className="text-lg font-bold text-white">98.4%</p>
-                                </div>
-                            </motion.div>
-
-                            <Image
-                                src="/parihaaram-logo.png"
-                                alt="App"
-                                width={600}
-                                height={800}
-                                className="w-full h-auto opacity-20 pointer-events-none"
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <SampleCard
+                                icon={<Briefcase className="w-6 h-6 text-blue-500" />}
+                                question="Why am I not getting a job?"
+                                desc="Analyze planetary blocks in your career house (10th house) and find out when the timing is right."
+                            />
+                            <SampleCard
+                                icon={<Heart className="w-6 h-6 text-rose-500" />}
+                                question="Will my ex come back?"
+                                desc="Check compatibility and Venus/Mars transits to see if reconnection is written in your stars."
+                            />
+                            <SampleCard
+                                icon={<Smile className="w-6 h-6 text-amber-500" />}
+                                question="Why do I feel so lost?"
+                                desc="Understand if you are going through Sade Sati or a difficult Dasha period and get remedies."
                             />
                         </div>
+                    </div>
+
+                    {/* Testimonials Grid - Reorganized */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-12">
+                        <div className="col-span-1 lg:col-span-3 text-center mb-8">
+                            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Real Stories from Users</h2>
+                        </div>
+                        <TestimonialCard
+                            name="Priya Menon"
+                            place="Kochi"
+                            text="I was consulting astrologers for years about my marriage delay. The AI pointed out a specific Dosha that others missed and suggested a simple remedy. I got engaged 3 months later!"
+                        />
+                        <TestimonialCard
+                            name="Rajesh Kumar"
+                            place="Delhi"
+                            text="I asked 'When will I get a promotion?' and it gave me a date range. It happened exactly in that week. The precision is actually scary."
+                        />
+                        <TestimonialCard
+                            name="Amit Patel"
+                            place="Ahmedabad"
+                            text="Much better than generic horoscopes. It explains WHY things are happening based on my chart. Helped me navigate a very tough business loss."
+                        />
                     </div>
 
                 </div>
@@ -230,17 +338,37 @@ export default function AIAstrologerLanding() {
                 isOpen={isAuthOpen}
                 onClose={() => setIsAuthOpen(false)}
                 initialMode="signup"
+                customTitle="Unlock Your Destiny"
+                customDescription="Join thousands of others. Create your free account to reveal your personal birth chart analysis instantly."
             />
         </main>
     );
 }
 
-function CheckIcon() {
+function SampleCard({ icon, question, desc }: any) {
     return (
-        <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/20">
-            <svg className="w-3 h-3 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-            </svg>
+        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-lg hover:shadow-xl hover:border-indigo-100 transition-all group cursor-default">
+            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                {icon}
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-3 group-hover:text-indigo-700 transition-colors">"{question}"</h3>
+            <p className="text-sm text-slate-500 leading-relaxed font-medium">{desc}</p>
+        </div>
+    )
+}
+
+function TestimonialCard({ name, place, text }: any) {
+    return (
+        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all relative">
+            <Quote className="w-8 h-8 text-indigo-100 absolute top-6 right-6 fill-indigo-50" />
+            <div className="flex items-center gap-1 mb-4 text-amber-500">
+                {[1, 2, 3, 4, 5].map(i => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
+            </div>
+            <p className="text-slate-600 font-medium leading-relaxed mb-6">"{text}"</p>
+            <div>
+                <p className="text-sm font-bold text-slate-900">{name}</p>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{place}</p>
+            </div>
         </div>
     )
 }

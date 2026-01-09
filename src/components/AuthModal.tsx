@@ -118,7 +118,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', cust
                                     width={0}
                                     height={0}
                                     sizes="100vw"
-                                    className="h-24 w-auto object-contain"
+                                    className="h-12 w-auto object-contain"
                                     style={{ width: 'auto', height: '100%' }}
                                 />
                             </div>
