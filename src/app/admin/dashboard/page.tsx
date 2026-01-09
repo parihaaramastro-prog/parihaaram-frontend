@@ -94,9 +94,9 @@ export default function AdminDashboard() {
                 pack_credits: packCredits
             });
             alert("Pricing configuration synced globally.");
-        } catch (e) {
-            console.error(e);
-            alert("Failed to save pricing.");
+        } catch (e: any) {
+            console.error("Save Pricing Error:", e);
+            alert(`Failed to save pricing: ${e.message || "Unknown error"}`);
         }
     };
 
@@ -204,7 +204,7 @@ export default function AdminDashboard() {
     const handleLogout = async () => {
         const supabase = createClient();
         await supabase.auth.signOut();
-        router.push('/');
+        window.location.href = '/';
     };
 
     return (

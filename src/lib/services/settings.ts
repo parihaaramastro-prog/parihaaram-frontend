@@ -36,10 +36,12 @@ export const settingsService = {
 
     async updateSettings(settings: Partial<AppSettings>): Promise<void> {
         const supabase = createClient();
-        // Upsert logic. We assume ID 1 for the singleton settings row.
+        // Use UPDATE instead of UPSERT to avoid trying to write to the 'id' column
+        // This avoids the "cannot insert a non-DEFAULT value" error for Identity columns.
         const { error } = await supabase
             .from('app_settings')
-            .upsert({ id: 1, ...settings }); // Assuming 'id' is the primary key and value is 1
+            .update(settings)
+            .eq('id', 1);
 
         if (error) throw error;
     }

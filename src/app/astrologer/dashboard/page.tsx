@@ -5,13 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     LayoutDashboard, Briefcase, Clock, CheckCircle2,
     ArrowRight, Loader2, Sparkles, User, Mail, Calendar,
-    MapPin, MessageSquare, AlertCircle, Heart, Activity, DollarSign, X, ArrowLeft, History, LogOut
+    MapPin, MessageSquare, AlertCircle, Heart, Activity, DollarSign, X, ArrowLeft, History, LogOut, Languages
 } from "lucide-react";
 import { consultationService, ConsultationRequest } from "@/lib/services/consultation";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import SouthIndianChart from "@/components/SouthIndianChart";
-import { AstrologyResults } from "@/lib/astrology";
+import { AstrologyResults, RASHIS_LIST } from "@/lib/astrology";
 
 const CATEGORIES = [
     { id: 'career', label: 'Career', icon: Briefcase, color: 'text-blue-600' },
@@ -30,6 +30,7 @@ export default function AstrologerDashboard() {
     const [submitting, setSubmitting] = useState(false);
     const [astrologyResults, setAstrologyResults] = useState<AstrologyResults | null>(null);
     const [calculating, setCalculating] = useState(false);
+    const [lang, setLang] = useState<'en' | 'ta'>('en');
 
     useEffect(() => {
         const fetchTasks = async () => {
@@ -81,7 +82,7 @@ export default function AstrologerDashboard() {
     const handleLogout = async () => {
         const supabase = createClient();
         await supabase.auth.signOut();
-        router.push('/');
+        window.location.href = '/';
     };
 
     const handleOpenTask = (task: ConsultationRequest) => {
@@ -118,13 +119,24 @@ export default function AstrologerDashboard() {
                             <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Dashboard</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="p-2 text-slate-400 hover:text-red-600 transition-colors"
-                        title="Sign Out"
-                    >
-                        <LogOut className="w-5 h-5" />
-                    </button>
+
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setLang(l => l === 'en' ? 'ta' : 'en')}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors"
+                        >
+                            <Languages className="w-3.5 h-3.5" />
+                            {lang === 'en' ? 'English' : 'தமிழ்'}
+                        </button>
+
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                            title="Sign Out"
+                        >
+                            <LogOut className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -164,14 +176,17 @@ export default function AstrologerDashboard() {
                                             <div className="flex items-start justify-between w-full">
                                                 <div className="space-y-1">
                                                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${task.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
-                                                            task.status === 'pending_admin' ? 'bg-indigo-50 text-indigo-700' :
-                                                                'bg-amber-50 text-amber-700'
+                                                        task.status === 'pending_admin' ? 'bg-indigo-50 text-indigo-700' :
+                                                            'bg-amber-50 text-amber-700'
                                                         }`}>
                                                         {task.status === 'completed' ? 'Published' :
                                                             task.status === 'pending_admin' ? 'Under Review' :
                                                                 'Pending Action'}
                                                     </span>
-                                                    <h3 className="text-base font-bold text-slate-900">{task.horoscopes?.name || 'Unknown'}</h3>
+                                                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                                                        <User className="w-3.5 h-3.5 text-slate-400" />
+                                                        Case #{task.id.slice(0, 6)}
+                                                    </h3>
                                                 </div>
                                                 <History className="w-4 h-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
                                             </div>
@@ -224,8 +239,14 @@ export default function AstrologerDashboard() {
                                         <ArrowLeft className="w-5 h-5 text-slate-500" />
                                     </button>
                                     <div>
-                                        <h2 className="text-xl font-bold text-slate-900">{selectedTask.horoscopes?.name}</h2>
-                                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-indigo-50 rounded-lg">
+                                                <User className="w-4 h-4 text-indigo-600" />
+                                            </div>
+                                            <h2 className="text-xl font-bold text-slate-900">Protected User</h2>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-2">
+                                            <span className="flex items-center gap-1 font-mono uppercase bg-slate-50 px-2 py-0.5 rounded">ID: {selectedTask.id.slice(0, 8)}</span>
                                             <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {selectedTask.horoscopes?.dob}</span>
                                             <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {selectedTask.horoscopes?.tob}</span>
                                             <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {selectedTask.horoscopes?.pob}</span>
@@ -242,11 +263,15 @@ export default function AstrologerDashboard() {
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                {/* Chart Section */}
-                                <div className="lg:col-span-5 space-y-6">
+                                {/* Chart Section (Left) */}
+                                <div className="lg:col-span-6 space-y-6">
+                                    {/* Rasi Chart */}
                                     <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                                         <div className="mb-6 flex items-center justify-between">
-                                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Birth Chart</h3>
+                                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4 text-indigo-600" />
+                                                Birth Chart (Rasi)
+                                            </h3>
                                             {calculating && <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />}
                                         </div>
 
@@ -254,24 +279,16 @@ export default function AstrologerDashboard() {
                                             <div className="space-y-6">
                                                 <div className="bg-slate-900 p-4 sm:p-6 rounded-xl">
                                                     <SouthIndianChart
-                                                        title="Rasi Chart"
+                                                        title={lang === 'ta' ? "ராசி" : "Rasi"}
                                                         planets={astrologyResults.planets}
                                                         lagnaIdx={astrologyResults.lagna.idx}
+                                                        language={lang}
                                                     />
                                                 </div>
                                                 <div className="grid grid-cols-3 gap-3">
-                                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Lagna</p>
-                                                        <p className="text-sm font-bold text-slate-900">{astrologyResults.lagna.name}</p>
-                                                    </div>
-                                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Moon</p>
-                                                        <p className="text-sm font-bold text-slate-900">{astrologyResults.moon_sign.name}</p>
-                                                    </div>
-                                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Nakshatra</p>
-                                                        <p className="text-sm font-bold text-slate-900 truncate">{astrologyResults.nakshatra.name}</p>
-                                                    </div>
+                                                    <InfoBox label="Lagna" value={lang === 'ta' ? astrologyResults.lagna.name_ta : astrologyResults.lagna.name} />
+                                                    <InfoBox label="Moon" value={lang === 'ta' ? astrologyResults.moon_sign.name_ta : astrologyResults.moon_sign.name} />
+                                                    <InfoBox label="Star" value={astrologyResults.nakshatra.name} />
                                                 </div>
                                             </div>
                                         ) : (
@@ -281,15 +298,77 @@ export default function AstrologerDashboard() {
                                         )}
                                     </div>
 
+                                    {/* Navamsa Chart */}
+                                    {astrologyResults?.navamsa_chart && (
+                                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                            <div className="mb-6 flex items-center justify-between">
+                                                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                                                    <Sparkles className="w-4 h-4 text-purple-600" />
+                                                    Navamsa (D9)
+                                                </h3>
+                                            </div>
+                                            <div className="bg-slate-900 p-4 sm:p-6 rounded-xl">
+                                                <SouthIndianChart
+                                                    title={lang === 'ta' ? "நவாம்சம்" : "Navamsa"}
+                                                    planets={astrologyResults.navamsa_chart.planets.map(p => ({
+                                                        name: p.planet,
+                                                        rasi_idx: p.rasi_idx
+                                                    }))}
+                                                    lagnaIdx={astrologyResults.navamsa_chart.lagna.rasi_idx}
+                                                    language={lang}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Right Section: Timeline & Editor */}
+                                <div className="lg:col-span-6 flex flex-col gap-6">
                                     {/* Inquiry Box */}
                                     <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 text-amber-900">
                                         <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2 opacity-70">User Question</h3>
                                         <p className="text-sm font-medium italic">"{selectedTask.comments}"</p>
                                     </div>
-                                </div>
 
-                                {/* Editor Section */}
-                                <div className="lg:col-span-7 flex flex-col gap-4">
+                                    {/* Dasha Timeline */}
+                                    {astrologyResults && (
+                                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-h-[400px] overflow-y-auto">
+                                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2 sticky top-0 bg-white py-2 z-10">
+                                                <Clock className="w-4 h-4 text-slate-400" />
+                                                Vimshottari Dasha
+                                            </h3>
+
+                                            <div className="space-y-4 relative pl-4 border-l-2 border-slate-100">
+                                                {astrologyResults.mahadashas.slice(0, 5).map((md, i) => (
+                                                    <div key={i} className="relative">
+                                                        <div className={`absolute -left-[21px] top-2 w-3 h-3 rounded-full border-2 ${md.is_current ? 'bg-indigo-600 border-indigo-200' : 'bg-white border-slate-300'}`} />
+
+                                                        <div className={`p-4 rounded-xl border ${md.is_current ? 'bg-indigo-50 border-indigo-100' : 'bg-slate-50 border-slate-100'}`}>
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <h4 className={`text-sm font-bold uppercase ${md.is_current ? 'text-indigo-700' : 'text-slate-700'}`}>
+                                                                    {md.planet} Mahadasha
+                                                                </h4>
+                                                                <span className="text-[10px] font-mono text-slate-400">{md.end_date}</span>
+                                                            </div>
+
+                                                            {/* Show sub-periods (Bhukti) if current */}
+                                                            {/* We only show a few bhuktis to save space */}
+                                                            <div className="grid grid-cols-2 gap-2 mt-3">
+                                                                {md.bhuktis.map((bk, j) => (
+                                                                    <div key={j} className={`p-2 rounded-lg text-xs flex items-center justify-between ${bk.is_current ? 'bg-white shadow-sm ring-1 ring-indigo-200' : 'bg-slate-100/50'}`}>
+                                                                        <span className="font-bold text-slate-600">{bk.planet}</span>
+                                                                        <span className="text-[9px] text-slate-400">{bk.end_date}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Editor */}
                                     <div className="flex-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
                                         <div className="flex items-center justify-between mb-4">
                                             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Analysis Report</h3>
@@ -329,19 +408,12 @@ export default function AstrologerDashboard() {
     );
 }
 
-function DetailBadge({ icon, label, value }: { icon: any, label: string, value: string }) {
+function InfoBox({ label, value }: { label: string, value: string }) {
     return (
-        <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-3">
-            <div className="text-slate-400">{icon}</div>
-            <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
-                <p className="text-xs font-bold text-slate-900">{value}</p>
-            </div>
+        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+            <p className="text-[10px] text-slate-400 font-bold uppercase">{label}</p>
+            <p className="text-sm font-bold text-slate-900 truncate">{value}</p>
         </div>
     );
 }
 
-function ResultCard({ label, value, sub }: { label: string, value: string, sub: string }) {
-    // Unused in new design but kept for safety if I revert to separate components
-    return null;
-}
