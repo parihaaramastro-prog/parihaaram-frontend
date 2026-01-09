@@ -86,5 +86,15 @@ export const profileService = {
             .eq('id', userId);
 
         if (error) throw error;
+    },
+
+    async updateProfile(userId: string, updates: Partial<any>) {
+        const supabase = createClient();
+        const { error } = await supabase
+            .from('users')
+            .update(updates)
+            .eq('id', userId);
+
+        if (error) throw error;
     }
 };

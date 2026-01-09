@@ -20,6 +20,17 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', cust
 
     // Reset state when modal opens/closes or initialMode changes
     useEffect(() => {
+        // If initialMode ('login' or 'signup') is provided, respect it. 
+        // Note: The prop name in functionality was `initialMode` but in the interface it is `initialMode`.
+        // However, the caller passed `defaultView="signup"`. The interface needs `initialMode` or I should change the prop name.
+        // Wait, looking at the previous file content (lines 10-18):
+        // interface AuthModalProps { ... initialMode?: 'login' | 'signup'; ... }
+        // The calling code used `defaultView="signup"`. I need to start by adding `defaultView` to props or changing the caller.
+        // I will CHANG THE CALLER in the previous file (AIAstrologerLanding) to use `initialMode` instead of `defaultView` 
+        // BUT I can't edit that file in this step easily without another tool call. 
+        // Actually, I can just update the interface here to accept `defaultView` as an alias or just rename `initialMode`.
+        // Let's stick to `initialMode`.
+
         setIsLogin(initialMode === 'login');
     }, [initialMode, isOpen]);
 

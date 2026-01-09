@@ -114,7 +114,7 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
                             <button
                                 onClick={() => {
                                     setIsOpen(false);
-                                    // Add settings route when ready
+                                    router.push('/dashboard/settings');
                                 }}
                                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left group"
                             >
