@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { User, LogOut, Settings, ChevronDown, Mail, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { creditService } from "@/lib/services/credits";
 
 interface UserProfileDropdownProps {
     user: any;
@@ -12,6 +13,7 @@ interface UserProfileDropdownProps {
 
 export default function UserProfileDropdown({ user }: UserProfileDropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [credits, setCredits] = useState<number | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const supabase = createClient();
@@ -26,6 +28,12 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        if (isOpen) {
+            creditService.getCredits().then(setCredits);
+        }
+    }, [isOpen]);
 
     const handleSignOut = async () => {
         await supabase.auth.signOut();
@@ -89,9 +97,14 @@ export default function UserProfileDropdown({ user }: UserProfileDropdownProps) 
                             </div>
 
                             {/* Account Status Badge */}
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full">
-                                <Shield className="w-3 h-3 text-emerald-600" />
-                                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Verified Account</span>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full">
+                                    <Shield className="w-3 h-3 text-emerald-600" />
+                                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Verified</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-full">
+                                    <span className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">{credits ?? '-'} Credits</span>
+                                </div>
                             </div>
                         </div>
 

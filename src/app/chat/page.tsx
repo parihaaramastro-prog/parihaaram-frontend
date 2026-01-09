@@ -13,6 +13,7 @@ import { SavedHoroscope, horoscopeService } from "@/lib/services/horoscope";
 import { aiService, ChatIntent } from "@/lib/services/ai";
 import { creditService } from "@/lib/services/credits";
 import { createClient } from "@/lib/supabase";
+import { settingsService } from "@/lib/services/settings";
 import { loadRazorpay } from "@/lib/loadRazorpay";
 import ProfileSelectionModal from "@/components/ProfileSelectionModal";
 import ReactMarkdown from 'react-markdown';
@@ -46,6 +47,7 @@ function ChatContent() {
     // User State
     const [userEmail, setUserEmail] = useState<string | null>(null);
     const [packConfig, setPackConfig] = useState({ price: 49, credits: 10 });
+    const [razorpayEnabled, setRazorpayEnabled] = useState(false);
 
     // Auto-Start Check
     useEffect(() => {
@@ -138,12 +140,11 @@ function ChatContent() {
         };
         fetchUser();
 
-        // Load Pack Config (Local Simulation for now as per requests)
-        const storedPrice = localStorage.getItem('pack_price');
-        const storedCredits = localStorage.getItem('pack_credits');
-        if (storedPrice && storedCredits) {
-            setPackConfig({ price: parseInt(storedPrice), credits: parseInt(storedCredits) });
-        }
+        // Load Settings from Server
+        settingsService.getSettings().then(s => {
+            setPackConfig({ price: s.pack_price, credits: s.pack_credits });
+            setRazorpayEnabled(s.razorpay_enabled);
+        });
     }, []);
 
     const getCurrentChat = () => chats.find(c => c.id === currentChatId);
@@ -481,7 +482,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                 <button
                                     disabled={credits === undefined}
                                     onClick={async () => {
-                                        const isRazorpayEnabled = localStorage.getItem('razorpay_enabled') === 'true';
+                                        const isRazorpayEnabled = razorpayEnabled;
 
                                         if (!isRazorpayEnabled) {
                                             // SIMULATION MODE

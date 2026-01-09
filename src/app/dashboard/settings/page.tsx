@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { User, Mail, Shield, AlertTriangle, Loader2, CheckCircle2, Crown, Bell, Lock } from "lucide-react";
+import { User, Mail, Shield, AlertTriangle, Loader2, CheckCircle2, Crown, Bell, Lock, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function AccountSettings() {
@@ -62,18 +62,32 @@ export default function AccountSettings() {
     }
 
     return (
-        <main className="min-h-screen bg-slate-50 pt-32 pb-20 px-6">
-            <div className="max-w-3xl mx-auto space-y-8">
+        <main className="min-h-screen bg-slate-50 pt-24 pb-10 px-4 sm:pt-32 sm:pb-20 sm:px-6">
+            <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8">
 
                 {/* Header */}
-                <div className="space-y-2">
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tighter">Account Settings</h1>
-                    <p className="text-slate-500 font-medium">Manage your personal information and preferences.</p>
+                <div className="flex items-start gap-4">
+                    <button
+                        onClick={() => router.push('/dashboard')}
+                        className="mt-1 p-2 -ml-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <div className="space-y-1">
+                        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tighter">Account Settings</h1>
+                        <p className="text-sm md:text-base text-slate-500 font-medium">Manage your personal information and preferences.</p>
+                    </div>
                 </div>
 
                 {/* Profile Card */}
                 <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
-                    <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
+                    {/* Cover Banner */}
+                    <div className="h-32 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 relative">
+                        <div className="absolute inset-0 bg-black/10" />
+                    </div>
+
+                    {/* User Info */}
+                    <div className="p-6 sm:p-8 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
                         <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-2xl shadow-inner">
                             {fullName ? fullName[0] : user.email[0].toUpperCase()}
                         </div>
@@ -88,7 +102,7 @@ export default function AccountSettings() {
                         </div>
                     </div>
 
-                    <div className="p-8 space-y-8">
+                    <div className="p-6 sm:p-8 space-y-8">
                         {/* Personal Info */}
                         <section className="space-y-6">
                             <div className="flex items-center gap-3 pb-2 border-b border-slate-100">

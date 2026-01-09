@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { consultationService } from "@/lib/services/consultation";
 import { profileService, User } from "@/lib/services/profile";
+import { settingsService } from "@/lib/services/settings";
 
 export default function AdminDashboard() {
     const router = useRouter();
@@ -68,26 +69,35 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         fetchData();
-        const stored = localStorage.getItem('razorpay_enabled');
-        setRazorpayEnabled(stored === 'true');
-
-        const storedPrice = localStorage.getItem('pack_price');
-        if (storedPrice) setPackPrice(parseInt(storedPrice));
-
-        const storedCredits = localStorage.getItem('pack_credits');
-        if (storedCredits) setPackCredits(parseInt(storedCredits));
+        settingsService.getSettings().then(s => {
+            setRazorpayEnabled(s.razorpay_enabled);
+            setPackPrice(s.pack_price);
+            setPackCredits(s.pack_credits);
+        });
     }, []);
 
-    const toggleRazorpay = () => {
+    const toggleRazorpay = async () => {
         const newState = !razorpayEnabled;
         setRazorpayEnabled(newState);
-        localStorage.setItem('razorpay_enabled', String(newState));
+        try {
+            await settingsService.updateSettings({ razorpay_enabled: newState });
+        } catch (e) {
+            console.error(e);
+            alert("Failed to sync setting to server.");
+        }
     };
 
-    const savePricing = () => {
-        localStorage.setItem('pack_price', packPrice.toString());
-        localStorage.setItem('pack_credits', packCredits.toString());
-        alert("Pricing configuration updated.");
+    const savePricing = async () => {
+        try {
+            await settingsService.updateSettings({
+                pack_price: packPrice,
+                pack_credits: packCredits
+            });
+            alert("Pricing configuration synced globally.");
+        } catch (e) {
+            console.error(e);
+            alert("Failed to save pricing.");
+        }
     };
 
     const handleAssign = async (consultationId: string, astrologerId: string) => {

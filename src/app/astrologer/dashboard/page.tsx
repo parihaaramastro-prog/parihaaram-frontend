@@ -14,11 +14,11 @@ import SouthIndianChart from "@/components/SouthIndianChart";
 import { AstrologyResults } from "@/lib/astrology";
 
 const CATEGORIES = [
-    { id: 'career', label: 'Career & Growth', icon: Briefcase, color: 'text-blue-500' },
-    { id: 'love', label: 'Relationships', icon: Heart, color: 'text-rose-500' },
-    { id: 'health', label: 'Health & Vitality', icon: Activity, color: 'text-emerald-500' },
-    { id: 'wealth', label: 'Financial Strategy', icon: DollarSign, color: 'text-amber-500' },
-    { id: 'family', label: 'Family Dynamics', icon: MessageSquare, color: 'text-purple-500' },
+    { id: 'career', label: 'Career', icon: Briefcase, color: 'text-blue-600' },
+    { id: 'love', label: 'Relationships', icon: Heart, color: 'text-rose-600' },
+    { id: 'health', label: 'Health', icon: Activity, color: 'text-emerald-600' },
+    { id: 'wealth', label: 'Wealth', icon: DollarSign, color: 'text-amber-600' },
+    { id: 'family', label: 'Family', icon: MessageSquare, color: 'text-purple-600' },
 ];
 
 export default function AstrologerDashboard() {
@@ -96,7 +96,7 @@ export default function AstrologerDashboard() {
             await consultationService.submitReport(selectedTask.id, reportContent);
             setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, status: 'pending_admin', report_content: reportContent } : t));
             setSelectedTask(null);
-            alert("Analysis submitted to Admin for final validation.");
+            alert("Report submitted for validation.");
         } catch (error) {
             alert("Failed to sync report.");
         } finally {
@@ -105,87 +105,104 @@ export default function AstrologerDashboard() {
     };
 
     return (
-        <main className="min-h-screen bg-slate-50 pt-32 pb-40">
-            <div className="max-w-[1400px] mx-auto px-6">
+        <main className="min-h-screen bg-slate-50 pb-20 safe-area-inset-bottom">
+            {/* Header */}
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-30 safe-area-inset-top">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-600 rounded-lg">
+                            <Briefcase className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-lg font-bold text-slate-900 leading-none">Consultant</h1>
+                            <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Dashboard</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                        title="Sign Out"
+                    >
+                        <LogOut className="w-5 h-5" />
+                    </button>
+                </div>
+            </header>
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
                 <AnimatePresence mode="wait">
                     {!selectedTask ? (
                         <motion.div
                             key="queue"
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            className="space-y-10"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="space-y-6"
                         >
                             <div className="flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <h1 className="text-4xl font-bold text-slate-900 tracking-tighter flex items-center gap-4 uppercase">
-                                        <Briefcase className="w-10 h-10 text-indigo-600" />
-                                        Analytical Terminal
-                                    </h1>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] pl-14">Centralized Job Card Management</p>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm text-center min-w-[140px]">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Queue Status</p>
-                                        <p className="text-xl font-bold text-slate-900">{tasks.length} Jobs Active</p>
-                                    </div>
-                                    <button
-                                        onClick={handleLogout}
-                                        className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-50 text-slate-400 hover:text-rose-500 transition-colors"
-                                        title="Sign Out"
-                                    >
-                                        <LogOut className="w-5 h-5" />
-                                    </button>
-                                </div>
+                                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                                    Active Cases ({tasks.length})
+                                </h2>
                             </div>
 
                             {loading ? (
-                                <div className="p-40 flex flex-col items-center justify-center space-y-4 bg-white border border-slate-200 border-dashed rounded-[3rem]">
-                                    <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Establishing Satellite Link...</p>
+                                <div className="py-20 flex flex-col items-center justify-center space-y-3">
+                                    <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+                                    <p className="text-xs font-medium text-slate-500">Loading cases...</p>
                                 </div>
                             ) : tasks.length > 0 ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {tasks.map((task) => (
                                         <motion.button
                                             key={task.id}
                                             onClick={() => handleOpenTask(task)}
-                                            whileHover={{ scale: 1.02, y: -4 }}
-                                            className="group text-left bg-white p-8 rounded-[2.5rem] border border-slate-200 hover:border-indigo-600 transition-all shadow-xl hover:shadow-indigo-500/10 flex flex-col gap-6"
+                                            whileTap={{ scale: 0.98 }}
+                                            className="group text-left bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-600 hover:shadow-lg hover:shadow-indigo-500/5 transition-all flex flex-col gap-4 relative overflow-hidden"
                                         >
-                                            <div className="flex items-center justify-between">
-                                                <div className={`px-4 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${task.status === 'completed' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
-                                                    task.status === 'pending_admin' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
-                                                        'bg-amber-50 border-amber-100 text-amber-600'
-                                                    }`}>
-                                                    {task.status === 'completed' ? 'Published' :
-                                                        task.status === 'pending_admin' ? 'Awaiting Admin' :
-                                                            'Action Required'}
+                                            <div className="absolute top-0 left-0 w-1 h-full bg-slate-200 group-hover:bg-indigo-600 transition-colors" />
+
+                                            <div className="flex items-start justify-between w-full">
+                                                <div className="space-y-1">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${task.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
+                                                            task.status === 'pending_admin' ? 'bg-indigo-50 text-indigo-700' :
+                                                                'bg-amber-50 text-amber-700'
+                                                        }`}>
+                                                        {task.status === 'completed' ? 'Published' :
+                                                            task.status === 'pending_admin' ? 'Under Review' :
+                                                                'Pending Action'}
+                                                    </span>
+                                                    <h3 className="text-base font-bold text-slate-900">{task.horoscopes?.name || 'Unknown'}</h3>
                                                 </div>
-                                                <History className="w-4 h-4 text-slate-200 group-hover:text-indigo-400 transition-colors" />
+                                                <History className="w-4 h-4 text-slate-300 group-hover:text-indigo-600 transition-colors" />
                                             </div>
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <h3 className="text-xl font-bold text-slate-900 uppercase tracking-tight">{task.horoscopes?.name || 'Identity Unknown'}</h3>
-                                                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-1">Focus: {task.categories.join(' • ')}</p>
+
+                                            <div className="space-y-3 pt-2 border-t border-slate-50 w-full">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {task.categories.map(cat => (
+                                                        <span key={cat} className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                                                            {cat}
+                                                        </span>
+                                                    ))}
                                                 </div>
-                                                <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-t border-slate-100 pt-4">
-                                                    <Calendar className="w-3.5 h-3.5" /> {task.horoscopes?.dob}
-                                                    <MapPin className="w-3.5 h-3.5 ml-2" /> {task.horoscopes?.pob}
+                                                <div className="flex items-center gap-4 text-[11px] font-medium text-slate-400">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Calendar className="w-3 h-3" /> {task.horoscopes?.dob}
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <MapPin className="w-3 h-3" /> {task.horoscopes?.pob}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </motion.button>
                                     ))}
                                 </div>
                             ) : (
-                                <div className="bg-white border border-slate-200 rounded-[3rem] p-40 text-center border-dashed space-y-6">
-                                    <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto transition-transform hover:rotate-12">
-                                        <CheckCircle2 className="w-12 h-12 text-slate-200" />
+                                <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
+                                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <CheckCircle2 className="w-8 h-8 text-slate-300" />
                                     </div>
-                                    <div className="space-y-2">
-                                        <p className="text-xl font-bold text-slate-900 uppercase tracking-tighter">Operational Peace</p>
-                                        <p className="text-xs text-slate-400 font-medium uppercase tracking-widest">No active inquiries detected in the pipeline.</p>
-                                    </div>
+                                    <p className="text-base font-bold text-slate-900">All caught up</p>
+                                    <p className="text-sm text-slate-500">No pending inquiries assigned to you.</p>
                                 </div>
                             )}
                         </motion.div>
@@ -195,150 +212,113 @@ export default function AstrologerDashboard() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 20 }}
-                            className="bg-white border border-slate-200 rounded-[3.5rem] shadow-2xl overflow-hidden min-h-[85vh] flex flex-col"
+                            className="flex flex-col gap-6"
                         >
-                            {/* Full Page Detail Header */}
-                            <div className="p-10 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-8">
-                                <div className="flex items-center gap-6">
+                            {/* Detail Header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                <div className="flex items-center gap-4">
                                     <button
                                         onClick={() => setSelectedTask(null)}
-                                        className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm active:scale-90"
+                                        className="p-2 -ml-2 hover:bg-slate-50 rounded-full transition-colors"
                                     >
-                                        <ArrowLeft className="w-5 h-5" />
+                                        <ArrowLeft className="w-5 h-5 text-slate-500" />
                                     </button>
-                                    <div className="space-y-1">
-                                        <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Deep Analysis Suite</h2>
-                                        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.3em]">Job Protocol #{selectedTask.id.slice(0, 8)}</p>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-slate-900">{selectedTask.horoscopes?.name}</h2>
+                                        <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                                            <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {selectedTask.horoscopes?.dob}</span>
+                                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {selectedTask.horoscopes?.tob}</span>
+                                            <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {selectedTask.horoscopes?.pob}</span>
+                                        </div>
                                     </div>
                                 </div>
-
-                                <div className="flex flex-wrap gap-3">
-                                    <DetailBadge icon={<User className="w-3.5 h-3.5" />} label="Identity" value={selectedTask.horoscopes?.name || 'N/A'} />
-                                    <DetailBadge icon={<Calendar className="w-3.5 h-3.5" />} label="DOB" value={selectedTask.horoscopes?.dob || 'N/A'} />
-                                    <DetailBadge icon={<Clock className="w-3.5 h-3.5" />} label="TOB" value={selectedTask.horoscopes?.tob || 'N/A'} />
-                                    <DetailBadge icon={<MapPin className="w-3.5 h-3.5" />} label="POB" value={selectedTask.horoscopes?.pob || 'N/A'} />
+                                <div className="flex gap-2">
+                                    {selectedTask.categories.map(c => (
+                                        <span key={c} className="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-wider rounded-lg">
+                                            {c}
+                                        </span>
+                                    ))}
                                 </div>
                             </div>
 
-                            <div className="flex-1 p-10 grid grid-cols-1 lg:grid-cols-12 gap-12 overflow-y-auto">
-                                {/* Left Side: Astronomical Engine */}
-                                <div className="lg:col-span-5 space-y-10">
-                                    <div className="space-y-6">
-                                        <div className="flex items-center gap-3">
-                                            <Sparkles className="w-5 h-5 text-indigo-600" />
-                                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-[0.2em]">Spacetime Configuration</h4>
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                {/* Chart Section */}
+                                <div className="lg:col-span-5 space-y-6">
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                        <div className="mb-6 flex items-center justify-between">
+                                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Birth Chart</h3>
+                                            {calculating && <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />}
                                         </div>
 
-                                        {calculating ? (
-                                            <div className="aspect-square bg-slate-50 border border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center space-y-6 border-dashed">
-                                                <div className="relative">
-                                                    <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
-                                                    <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-indigo-600 uppercase">CALC</div>
-                                                </div>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Parsing Planetary Degrees...</p>
-                                            </div>
-                                        ) : astrologyResults ? (
-                                            <div className="space-y-8 animate-in fade-in duration-700">
-                                                <div className="bg-slate-900 p-8 rounded-[3rem] shadow-2xl shadow-indigo-500/10">
+                                        {astrologyResults ? (
+                                            <div className="space-y-6">
+                                                <div className="bg-slate-900 p-4 sm:p-6 rounded-xl">
                                                     <SouthIndianChart
-                                                        title="Birth Rasi"
+                                                        title="Rasi Chart"
                                                         planets={astrologyResults.planets}
                                                         lagnaIdx={astrologyResults.lagna.idx}
                                                     />
                                                 </div>
-
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <ResultCard label="Nakshatra" value={astrologyResults.nakshatra.name} sub={`Padam ${astrologyResults.nakshatra.padam}`} />
-                                                    <ResultCard label="Moon Sign" value={astrologyResults.moon_sign.name} sub="Rasi Identity" />
-                                                    <ResultCard label="Lagna" value={astrologyResults.lagna.name} sub="Ascendant" />
+                                                <div className="grid grid-cols-3 gap-3">
+                                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Lagna</p>
+                                                        <p className="text-sm font-bold text-slate-900">{astrologyResults.lagna.name}</p>
+                                                    </div>
+                                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Moon</p>
+                                                        <p className="text-sm font-bold text-slate-900">{astrologyResults.moon_sign.name}</p>
+                                                    </div>
+                                                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Nakshatra</p>
+                                                        <p className="text-sm font-bold text-slate-900 truncate">{astrologyResults.nakshatra.name}</p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="aspect-square bg-red-50 border border-red-100 rounded-[2.5rem] flex flex-col items-center justify-center p-12 text-center space-y-4">
-                                                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
-                                                    <AlertCircle className="w-8 h-8 text-red-500" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <p className="text-sm font-bold text-red-900 uppercase tracking-widest">Calculation Failure</p>
-                                                    <p className="text-[10px] font-medium text-red-400 uppercase tracking-widest leading-relaxed">Identity metadata incomplete or engine unreachable. Check server status.</p>
-                                                </div>
+                                            <div className="h-64 flex items-center justify-center text-slate-400 text-xs font-medium bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                                Chart Data Unavailable
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Inquiry Box */}
+                                    <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 text-amber-900">
+                                        <h3 className="text-[10px] font-bold uppercase tracking-wider mb-2 opacity-70">User Question</h3>
+                                        <p className="text-sm font-medium italic">"{selectedTask.comments}"</p>
+                                    </div>
                                 </div>
 
-                                {/* Right Side: Inquiry & Report */}
-                                <div className="lg:col-span-7 space-y-12">
-                                    {/* Focus Areas */}
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <History className="w-5 h-5 text-indigo-600" />
-                                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-[0.2em]">Inquiry Context</h4>
-                                        </div>
-                                        <div className="flex flex-wrap gap-3">
-                                            {selectedTask.categories.map(catId => {
-                                                const cat = CATEGORIES.find(c => c.id === catId);
-                                                if (!cat) return null;
-                                                const Icon = cat.icon;
-                                                return (
-                                                    <div key={catId} className="flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm transition-all hover:border-indigo-400 group">
-                                                        <Icon className={`w-4 h-4 ${cat.color} group-hover:scale-110 transition-transform`} />
-                                                        <span className="text-[11px] font-bold text-slate-700 uppercase tracking-widest">{cat.label}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    {/* Client Words */}
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-3">
-                                            <MessageSquare className="w-5 h-5 text-indigo-600" />
-                                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-[0.2em]">Seeker Testimony</h4>
-                                        </div>
-                                        <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200 italic text-base text-slate-600 leading-relaxed font-medium shadow-inner relative overflow-hidden">
-                                            <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500" />
-                                            "{selectedTask.comments}"
-                                        </div>
-                                    </div>
-
-                                    {/* Report Area */}
-                                    <div className="space-y-4 flex flex-col flex-1 pb-10">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <AlertCircle className="w-5 h-5 text-indigo-600" />
-                                                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-[0.2em]">Analytical Findings</h4>
-                                            </div>
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{reportContent.length} Characters Transcribed</span>
+                                {/* Editor Section */}
+                                <div className="lg:col-span-7 flex flex-col gap-4">
+                                    <div className="flex-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Analysis Report</h3>
+                                            <span className="text-[10px] font-bold text-slate-400">{reportContent.length} chars</span>
                                         </div>
                                         <textarea
                                             value={reportContent}
                                             onChange={(e) => setReportContent(e.target.value)}
-                                            placeholder="Transcribe surgical planetary insights here..."
-                                            className="w-full min-h-[400px] bg-slate-50 border border-slate-200 rounded-[2.5rem] p-10 text-base font-medium focus:ring-8 focus:ring-indigo-500/5 focus:border-indigo-600 transition-all outline-none resize-none shadow-inner"
+                                            placeholder="Write your detailed astrological analysis here..."
+                                            className="flex-1 w-full min-h-[300px] bg-slate-50 border-0 rounded-xl p-4 text-sm sm:text-base font-medium text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none"
                                         />
                                     </div>
-                                </div>
-                            </div>
 
-                            {/* Footer controls */}
-                            <div className="p-10 border-t border-slate-100 bg-white flex items-center justify-between">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">Encrypted Channel • Predictive Computing Authorized</p>
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        onClick={() => setSelectedTask(null)}
-                                        className="px-8 py-4 rounded-2xl text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors"
-                                    >
-                                        Discard Changes
-                                    </button>
-                                    <button
-                                        onClick={handleSubmitReport}
-                                        disabled={submitting || !reportContent}
-                                        className="bg-slate-900 hover:bg-indigo-600 text-white px-12 py-4 rounded-2xl text-[11px] font-bold uppercase tracking-widest transition-all shadow-2xl hover:shadow-indigo-500/20 flex items-center justify-center gap-4 disabled:opacity-50 active:scale-95"
-                                    >
-                                        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                                        Ship Findings & Close Protocol
-                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => setSelectedTask(null)}
+                                            className="px-6 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors flex-1"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleSubmitReport}
+                                            disabled={submitting || !reportContent}
+                                            className="px-6 py-3 rounded-xl bg-slate-900 text-white text-xs font-bold uppercase tracking-wider hover:bg-indigo-600 transition-colors shadow-lg hover:shadow-indigo-500/20 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2 flex-[2]"
+                                        >
+                                            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                            Submit Report
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </motion.div>
@@ -351,22 +331,17 @@ export default function AstrologerDashboard() {
 
 function DetailBadge({ icon, label, value }: { icon: any, label: string, value: string }) {
     return (
-        <div className="bg-white px-5 py-2.5 rounded-2xl border border-slate-200 flex items-center gap-3 shadow-sm">
-            <div className="text-indigo-600">{icon}</div>
-            <div className="flex flex-col">
-                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none">{label}</span>
-                <span className="text-[11px] font-black text-slate-900 uppercase tracking-tight mt-0.5">{value}</span>
+        <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 flex items-center gap-3">
+            <div className="text-slate-400">{icon}</div>
+            <div>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
+                <p className="text-xs font-bold text-slate-900">{value}</p>
             </div>
         </div>
     );
 }
 
 function ResultCard({ label, value, sub }: { label: string, value: string, sub: string }) {
-    return (
-        <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-2 group hover:bg-indigo-50 hover:border-indigo-200 transition-all">
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-indigo-400">{label}</p>
-            <p className="text-xl font-black text-slate-900 uppercase tracking-tighter">{value}</p>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-indigo-300">{sub}</p>
-        </div>
-    );
+    // Unused in new design but kept for safety if I revert to separate components
+    return null;
 }
