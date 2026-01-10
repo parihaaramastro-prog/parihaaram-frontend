@@ -54,15 +54,19 @@ export default function AdminDashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [conData, astroData, usersData, creditsData] = await Promise.all([
+            const [conData, astroData, creditsData] = await Promise.all([
                 consultationService.getAllConsultations(),
                 profileService.getAstrologers(),
-                profileService.getAllUsers(),
                 creditService.getAllUserCredits()
             ]);
+
+            // Fetch Users from Admin API (includes Google OAuth users)
+            const userRes = await fetch('/api/admin/users');
+            const userData = await userRes.json();
+
             setConsultations(conData);
             setAstrologers(astroData);
-            setAllUsers(usersData);
+            setAllUsers(userData.users || []);
 
             const creditMap: Record<string, number> = {};
             creditsData.forEach((c: any) => { creditMap[c.user_id] = c.credits; });
@@ -72,13 +76,8 @@ export default function AdminDashboard() {
             const complete = conData.filter((c: any) => c.status === 'completed').length;
             setStats({ total: conData.length, pending, complete });
         } catch (error: any) {
-            console.error("Terminal Sync Error:", {
-                message: error.message,
-                details: error.details,
-                hint: error.hint,
-                code: error.code
-            });
-            alert(`Operational Sync Failed: ${error.message || 'Check terminal logs'}`);
+            console.error("Terminal Sync Error:", error);
+            // alert(`Sync Error: ${error.message}`);
         } finally {
             setLoading(false);
         }
@@ -91,17 +90,19 @@ export default function AdminDashboard() {
             setPackPrice(s.pack_price);
             setPackCredits(s.pack_credits);
             if (s.ai_model) setAiModel(s.ai_model);
+        }).catch(() => {
+            // Siltently fail if settings table issue, defaults are used
+            console.warn("Settings table might need update");
         });
     }, []);
 
     const toggleRazorpay = async () => {
-        const newState = !razorpayEnabled;
-        setRazorpayEnabled(newState);
         try {
+            const newState = !razorpayEnabled;
+            setRazorpayEnabled(newState);
             await settingsService.updateSettings({ razorpay_enabled: newState });
-        } catch (e) {
-            console.error(e);
-            alert("Failed to sync setting to server.");
+        } catch (e: any) {
+            alert("Settings Update Failed: " + e.message + "\n\nYou likely need to add columns to your 'app_settings' table.");
         }
     };
 
@@ -113,8 +114,7 @@ export default function AdminDashboard() {
             });
             alert("Pricing configuration synced globally.");
         } catch (e: any) {
-            console.error("Save Pricing Error:", e);
-            alert(`Failed to save pricing: ${e.message || "Unknown error"}`);
+            alert(`Failed to save pricing: ${e.message}`);
         }
     };
 
@@ -124,7 +124,12 @@ export default function AdminDashboard() {
             alert("AI Model preference saved globally.");
         } catch (e: any) {
             console.error("Save Model Error:", e);
-            alert(`Failed to save model: ${e.message}`);
+            if (e.message.includes("column")) {
+                prompt("DATABASE SCHEMA UPDATE REQUIRED:\n\nCopy and run this SQL in your Supabase SQL Editor:",
+                    "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS ai_model TEXT DEFAULT 'gpt-4o';");
+            } else {
+                alert(`Failed to save model: ${e.message}`);
+            }
         }
     };
 

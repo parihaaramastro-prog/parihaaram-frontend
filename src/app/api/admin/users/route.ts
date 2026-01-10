@@ -13,6 +13,28 @@ const supabaseAdmin = createClient(
     }
 );
 
+export async function GET(req: NextRequest) {
+    try {
+        const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+        if (error) throw error;
+
+        // Map auth users to a friendly format
+        const mappedUsers = users.map(u => ({
+            id: u.id,
+            email: u.email || "",
+            role: u.user_metadata?.role || 'customer', // Fallback to metadata
+            full_name: u.user_metadata?.full_name || u.user_metadata?.name || 'User',
+            created_at: u.created_at,
+            last_sign_in: u.last_sign_in_at,
+            provider: u.app_metadata?.provider || 'email'
+        }));
+
+        return NextResponse.json({ users: mappedUsers });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
+
 export async function DELETE(req: NextRequest) {
     try {
         const { userId } = await req.json();
@@ -22,12 +44,15 @@ export async function DELETE(req: NextRequest) {
         if (authError) throw authError;
 
         // 2. Delete from public.users (if no cascade)
-        const { error: dbError } = await supabaseAdmin
-            .from('users')
-            .delete()
-            .eq('id', userId);
-
-        if (dbError) throw dbError;
+        // We use try-catch here because if foreign key fails or user doesn't exist, it's fine if auth is gone
+        try {
+            await supabaseAdmin
+                .from('users')
+                .delete()
+                .eq('id', userId);
+        } catch (e) {
+            console.warn("Public profile delete failed (might not exist):", e);
+        }
 
         return NextResponse.json({ success: true });
     } catch (error: any) {
