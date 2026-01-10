@@ -226,8 +226,11 @@ Nakshatra: ${c2.nakshatra?.name}
         if (selectedModel.startsWith('gemini')) {
             console.log(`--- Using Model: GEMINI-3-PRO ---`);
             // --- GEMINI HANDLER ---
+            const apiKey = process.env.GEMINI_API_KEY;
+            console.log("DEBUG: Gemini Key being used starts with:", apiKey?.substring(0, 10));
+
             const model = genAI.getGenerativeModel({
-                model: "gemini-1.5-pro",
+                model: "gemini-1.5-flash", // Switching to Flash for better stability/availability
                 systemInstruction: systemPrompt,
             });
 
