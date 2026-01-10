@@ -1,0 +1,81 @@
+import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+
+// Admin Client to bypass RLS and manage Auth users
+const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false
+        }
+    }
+);
+
+export async function DELETE(req: NextRequest) {
+    try {
+        const { userId } = await req.json();
+
+        // 1. Delete from Auth (this usually cascades if set up, but let's be sure)
+        const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+        if (authError) throw authError;
+
+        // 2. Delete from public.users (if no cascade)
+        const { error: dbError } = await supabaseAdmin
+            .from('users')
+            .delete()
+            .eq('id', userId);
+
+        if (dbError) throw dbError;
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
+
+export async function POST(req: NextRequest) {
+    try {
+        const { action, userId, email } = await req.json();
+
+        if (action === 'block') {
+            const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+                ban_duration: "876000h" // 100 years
+            });
+            if (error) throw error;
+            return NextResponse.json({ success: true, message: "User blocked" });
+        }
+
+        if (action === 'unblock') {
+            const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+                ban_duration: "none"
+            });
+            if (error) throw error;
+            return NextResponse.json({ success: true, message: "User unblocked" });
+        }
+
+        if (action === 'reset_password') {
+            const tempPassword = Math.random().toString(36).slice(-8) + "Aa1!";
+            const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+                password: tempPassword
+            });
+            if (error) throw error;
+            return NextResponse.json({ success: true, tempPassword });
+        }
+
+        if (action === 'magic_link') {
+            const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+                type: 'magiclink',
+                email: email
+            });
+            if (error) throw error;
+            return NextResponse.json({ success: true, link: data.properties.action_link });
+        }
+
+        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}

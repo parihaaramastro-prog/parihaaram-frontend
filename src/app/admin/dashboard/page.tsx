@@ -287,10 +287,11 @@ export default function AdminDashboard() {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-4 gap-3">
                         <StatCard icon={<Database className="w-4 h-4" />} label="Inquiries" value={stats.total} color="bg-slate-900" />
                         <StatCard icon={<Clock className="w-4 h-4" />} label="Pending" value={stats.pending} color="bg-amber-600" />
-                        <StatCard icon={<CheckCircle2 className="w-4 h-4" />} label="Capacity" value={astrologers.length} color="bg-indigo-600" />
+                        <StatCard icon={<CheckCircle2 className="w-4 h-4" />} label="Staff" value={astrologers.length} color="bg-indigo-600" />
+                        <StatCard icon={<Users className="w-4 h-4" />} label="Total Users" value={allUsers.length} color="bg-emerald-600" />
                     </div>
                 </div>
 
@@ -634,7 +635,7 @@ export default function AdminDashboard() {
                                             <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">User Details</th>
                                             <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Role</th>
                                             <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Balance</th>
-                                            <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
+                                            <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
@@ -650,10 +651,20 @@ export default function AdminDashboard() {
                                                     <td className="px-8 py-6">
                                                         <div className="space-y-1">
                                                             <p className="text-[13px] font-bold text-slate-900 uppercase tracking-tight">{u.full_name || 'Guest User'}</p>
-                                                            <p className="text-[10px] font-medium text-slate-400 flex items-center gap-2">
-                                                                <Mail className="w-3 h-3" /> {u.email}
-                                                            </p>
-                                                            <p className="text-[9px] font-mono text-slate-300">ID: {u.id}</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-[10px] font-medium text-slate-400 flex items-center gap-2">
+                                                                    <Mail className="w-3 h-3" /> {u.email}
+                                                                </p>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        navigator.clipboard.writeText(u.id);
+                                                                        alert("User ID copied");
+                                                                    }}
+                                                                    className="text-[9px] font-mono text-slate-300 hover:text-indigo-500 cursor-pointer"
+                                                                >
+                                                                    ID: {u.id.slice(0, 8)}...
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     <td className="px-8 py-6">
@@ -671,15 +682,89 @@ export default function AdminDashboard() {
                                                         </div>
                                                     </td>
                                                     <td className="px-8 py-6 text-right">
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedUserForCredits(u);
-                                                                setNewCreditBalance(userCredits[u.id] || 0);
-                                                            }}
-                                                            className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 hover:text-indigo-800 hover:underline"
-                                                        >
-                                                            Manage Credits
-                                                        </button>
+                                                        <div className="flex items-center justify-end gap-3">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedUserForCredits(u);
+                                                                    setNewCreditBalance(userCredits[u.id] || 0);
+                                                                }}
+                                                                className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                                                                title="Manage Credits"
+                                                            >
+                                                                <Coins className="w-4 h-4" />
+                                                            </button>
+
+                                                            <div className="w-px h-4 bg-slate-200" />
+
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (!confirm(`Generate a secure login link for ${u.email}?`)) return;
+                                                                    try {
+                                                                        const res = await fetch('/api/admin/users', {
+                                                                            method: 'POST',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ action: 'magic_link', email: u.email })
+                                                                        });
+                                                                        const data = await res.json();
+                                                                        if (data.link) {
+                                                                            window.open(data.link, '_blank');
+                                                                            alert("User accessed in new tab via Magic Link.");
+                                                                        } else {
+                                                                            throw new Error(data.error);
+                                                                        }
+                                                                    } catch (e: any) {
+                                                                        alert("Access failed: " + e.message);
+                                                                    }
+                                                                }}
+                                                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                                title="Access Account (Magic Link)"
+                                                            >
+                                                                <LogOut className="w-4 h-4 rotate-180" />
+                                                            </button>
+
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (!confirm(`Are you sure you want to BLOCK ${u.email}? They will not be able to login.`)) return;
+                                                                    try {
+                                                                        await fetch('/api/admin/users', {
+                                                                            method: 'POST',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ action: 'block', userId: u.id })
+                                                                        });
+                                                                        alert("User blocked.");
+                                                                    } catch (e) {
+                                                                        alert("Failed to block.");
+                                                                    }
+                                                                }}
+                                                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                                title="Block Account"
+                                                            >
+                                                                <Shield className="w-4 h-4" />
+                                                            </button>
+
+                                                            <button
+                                                                onClick={async () => {
+                                                                    const confirmEmail = prompt(`Type "${u.email}" to confirm PERMANENT DELETION:`);
+                                                                    if (confirmEmail !== u.email) return;
+
+                                                                    try {
+                                                                        await fetch('/api/admin/users', {
+                                                                            method: 'DELETE',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ userId: u.id })
+                                                                        });
+                                                                        alert("User permanently deleted.");
+                                                                        fetchData();
+                                                                    } catch (e: any) {
+                                                                        alert("Deletion failed: " + e.message);
+                                                                    }
+                                                                }}
+                                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                                                title="Delete Permanently"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
