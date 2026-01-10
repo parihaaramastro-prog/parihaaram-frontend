@@ -5,6 +5,7 @@ export interface AppSettings {
     razorpay_enabled: boolean;
     pack_price: number;
     pack_credits: number;
+    ai_model?: string;
 }
 
 export const settingsService = {
@@ -27,7 +28,8 @@ export const settingsService = {
             return {
                 razorpay_enabled: false,
                 pack_price: 99,
-                pack_credits: 5
+                pack_credits: 5,
+                ai_model: 'gpt-4o'
             };
         }
 
