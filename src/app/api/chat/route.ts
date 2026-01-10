@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { OpenAI } from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
@@ -8,6 +9,9 @@ import { cookies } from 'next/headers';
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Initialize Gemini client
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export async function POST(req: NextRequest) {
     try {
@@ -38,7 +42,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Check Credits
-        let { data: creditData, error: creditError } = await supabase
+        let { data: creditData } = await supabase
             .from('user_credits')
             .select('credits')
             .eq('user_id', user.id)
@@ -48,7 +52,7 @@ export async function POST(req: NextRequest) {
         if (!creditData) {
             const { data: newCredit } = await supabase
                 .from('user_credits')
-                .insert({ user_id: user.id, credits: 3 }) // 3 Free Trial Messages (No topic limits for free users)
+                .insert({ user_id: user.id, credits: 3 }) // 3 Free Trial Messages
                 .select()
                 .single();
             creditData = newCredit;
@@ -61,12 +65,19 @@ export async function POST(req: NextRequest) {
             }, { status: 402 });
         }
 
+        // 3. Fetch System Settings for Model Selection
+        const { data: settings } = await supabase
+            .from('app_settings')
+            .select('*')
+            .single();
+
+        const selectedModel = settings?.ai_model || 'gpt-4o'; // Default to GPT-4o
+
         const body = await req.json();
         const { messages, context } = body;
 
-        // Construct the system prompt based on astrological context
+        // Construct System Prompt
         const currentDate = new Date().toDateString();
-
         let systemPrompt = `You are Parihaaram AI — a calm, senior life strategist powered by Vedic astrology logic.
 Current Date: ${currentDate}.
 
@@ -174,19 +185,19 @@ Ground them with facts, patterns, and next actions.
 
             if (primaryProfile && primaryProfile.chart_data) {
                 const c = primaryProfile.chart_data;
-                const dasha = c.mahadashas.find((m: any) => m.is_current);
-                const bhukti = dasha?.bhuktis.find((b: any) => b.is_current);
+                const dasha = c.mahadashas?.find((m: any) => m.is_current);
+                const bhukti = dasha?.bhuktis?.find((b: any) => b.is_current);
 
                 systemPrompt += `\n\nActive Profile Context:
 Name: ${primaryProfile.name}
 Birth Details: ${primaryProfile.dob} at ${primaryProfile.tob} in ${primaryProfile.pob}
 Coordinates: ${primaryProfile.lat}, ${primaryProfile.lon}
-Lagna (Ascendant): ${c.lagna.name}
-Rasi (Moon Sign): ${c.moon_sign.name}
-Nakshatra: ${c.nakshatra.name}
+Lagna (Ascendant): ${c.lagna?.name}
+Rasi (Moon Sign): ${c.moon_sign?.name}
+Nakshatra: ${c.nakshatra?.name}
 Current Dasha: ${dasha?.planet || 'Unk'} (Ends: ${dasha?.end_date})
 Current Bhukti: ${bhukti?.planet || 'Unk'} (Ends: ${bhukti?.end_date})
-Planetary Positions: ${c.planets.map((p: any) => `${p.name} in ${p.rashi} (House ${p.house})`).join(', ')}
+Planetary Positions: ${c.planets?.map((p: any) => `${p.name} in ${p.rashi} (House ${p.house})`).join(', ')}
 `;
             }
 
@@ -194,44 +205,69 @@ Planetary Positions: ${c.planets.map((p: any) => `${p.name} in ${p.rashi} (House
                 const c2 = secondaryProfile.chart_data;
                 systemPrompt += `\n\nComparison Profile (Partner/Other):
 Name: ${secondaryProfile.name}
-Lagna: ${c2.lagna.name}
-Rasi: ${c2.moon_sign.name}
-Nakshatra: ${c2.nakshatra.name}
+Lagna: ${c2.lagna?.name}
+Rasi: ${c2.moon_sign?.name}
+Nakshatra: ${c2.nakshatra?.name}
 `;
             }
         }
 
-        // Determine Temperature based on Question Type (Decision vs Exploration)
+        // Determine Temperature
         const lastMessage = messages[messages.length - 1]?.content || "";
         const isDecisionQuestion = lastMessage.includes("?") ||
             lastMessage.toLowerCase().startsWith("should") ||
             lastMessage.toLowerCase().startsWith("can i");
-
         const temperature = isDecisionQuestion ? 0.4 : 0.7;
 
-        // Call OpenAI
-        console.log("------------------------------------------------------------------");
-        console.log("System Prompt:", systemPrompt);
-        console.log("Messages:", JSON.stringify(messages, null, 2));
-        console.log("Temperature:", temperature);
-        console.log("------------------------------------------------------------------");
+        let reply = "";
 
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o", // Strongest reasoning model
-            messages: [
-                { role: "system", content: systemPrompt },
-                ...messages
-            ],
-            temperature: temperature,
-            max_tokens: 500,
-        });
+        console.log(`--- Using Model: ${selectedModel.toUpperCase()} ---`);
 
-        const reply = completion.choices[0].message.content;
+        if (selectedModel.startsWith('gemini')) {
+            // --- GEMINI HANDLER ---
+            const model = genAI.getGenerativeModel({
+                model: "gemini-1.5-pro",
+                systemInstruction: systemPrompt,
+            });
+
+            // Convert OpenAI format messages to Gemini format (Content + Role)
+            // Gemini roles: 'user' or 'model'
+            const history = messages.slice(0, -1).map((m: any) => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: m.content }]
+            }));
+
+            // Start chat with history
+            const chat = model.startChat({
+                history: history,
+                generationConfig: {
+                    maxOutputTokens: 500,
+                    temperature: temperature,
+                },
+            });
+
+            const result = await chat.sendMessage(lastMessage);
+            reply = result.response.text();
+
+        } else {
+            // --- OPENAI HANDLER (Default) ---
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    ...messages
+                ],
+                temperature: temperature,
+                max_tokens: 500,
+            });
+
+            reply = completion.choices[0].message.content || "";
+        }
 
         console.log("LLM Reply:", reply);
         console.log("------------------------------------------------------------------");
 
-        // 3. Deduct Credit
+        // 4. Deduct Credit
         const { data: updatedCredit } = await supabase
             .from('user_credits')
             .update({ credits: creditData.credits - 1 })
@@ -245,7 +281,7 @@ Nakshatra: ${c2.nakshatra.name}
         });
 
     } catch (error: any) {
-        console.error("OpenAI Error:", error);
+        console.error("AI API Error:", error);
         return NextResponse.json(
             { error: "Failed to consult the stars. Please try again later." },
             { status: 500 }
