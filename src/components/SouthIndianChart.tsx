@@ -104,14 +104,21 @@ export default function SouthIndianChart({ title, planets, lagnaIdx, language = 
                             {isTa ? rasiInfo.ta : rasiInfo.en}
                         </span>
                         <div className="flex flex-wrap items-center justify-center gap-1.5 w-full">
-                            {planetsInHouse.map((p, i) => (
-                                <span key={i} className={`text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${p.isLagna ? 'bg-indigo-900 text-white' : 'text-slate-900 bg-slate-100'}`}>
-                                    {p.name}
-                                    {p.degrees !== undefined && !p.isLagna && (
-                                        <sup className="text-[7px] opacity-70 font-medium">{Math.floor(p.degrees)}°</sup>
-                                    )}
-                                </span>
-                            ))}
+                            {planetsInHouse.map((p, i) => {
+                                const deg = p.degrees !== undefined ? Math.floor(p.degrees) : 0;
+                                const min = p.degrees !== undefined ? Math.floor((p.degrees - deg) * 60) : 0;
+
+                                return (
+                                    <span key={i} className={`text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${p.isLagna ? 'bg-indigo-900 text-white' : 'text-slate-900 bg-slate-100'}`}>
+                                        {p.name}
+                                        {p.degrees !== undefined && !p.isLagna && (
+                                            <sup className="text-[8px] opacity-70 font-medium ml-0.5 tracking-tighter">
+                                                {deg}°{min.toString().padStart(2, '0')}&apos;
+                                            </sup>
+                                        )}
+                                    </span>
+                                );
+                            })}
                         </div>
                     </motion.div>
                 );

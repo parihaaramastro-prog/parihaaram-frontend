@@ -41,6 +41,12 @@ export async function POST(req: NextRequest) {
             lon: lon
         };
 
+        console.log("---------------------------------------------------");
+        console.log(`ASTRO REQUEST: IST Input: ${dob} ${tob}`);
+        console.log(`ASTRO REQUEST: Calculated UTC: ${uY}-${uM}-${uD} ${uH}:${uMn}`);
+        console.log(`ASTRO REQUEST: Lat/Lon: ${lat}, ${lon}`);
+        console.log("---------------------------------------------------");
+
         console.log(`Sending calculation request to: ${apiUrl}/calculate`);
 
         const apiResponse = await fetch(`${apiUrl}/calculate`, {
