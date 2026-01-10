@@ -4,6 +4,7 @@ export interface PlanetPosition {
     rashiTamil: string;
     rasi_idx: number;
     degrees: number;
+    house: number;
 }
 
 export interface SookshmaDasha {

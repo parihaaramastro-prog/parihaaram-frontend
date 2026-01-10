@@ -6,6 +6,7 @@ import { RASHIS_LIST } from "@/lib/astrology";
 interface ChartPlanet {
     name: string;
     rasi_idx: number;
+    degrees?: number;
 }
 
 interface SouthIndianChartProps {
@@ -49,18 +50,21 @@ const PLANET_SHORT_NAMES_TA: Record<string, string> = {
 };
 
 export default function SouthIndianChart({ title, planets, lagnaIdx, language = 'en' }: SouthIndianChartProps) {
-    const houseContents: Record<number, string[]> = {};
+    const houseContents: Record<number, { name: string; degrees?: number; isLagna?: boolean }[]> = {};
     const isTa = language === 'ta';
     const namesMap = isTa ? PLANET_SHORT_NAMES_TA : PLANET_SHORT_NAMES_EN;
 
     // Add Lagna
     if (!houseContents[lagnaIdx]) houseContents[lagnaIdx] = [];
-    houseContents[lagnaIdx].push(isTa ? "லக்" : "ASC");
+    houseContents[lagnaIdx].push({ name: isTa ? "லக்" : "ASC", isLagna: true });
 
     // Add Planets
     planets.forEach(p => {
         if (!houseContents[p.rasi_idx]) houseContents[p.rasi_idx] = [];
-        houseContents[p.rasi_idx].push(namesMap[p.name] || p.name);
+        houseContents[p.rasi_idx].push({
+            name: namesMap[p.name] || p.name,
+            degrees: p.degrees
+        });
     });
 
     return (
@@ -101,8 +105,11 @@ export default function SouthIndianChart({ title, planets, lagnaIdx, language = 
                         </span>
                         <div className="flex flex-wrap items-center justify-center gap-1.5 w-full">
                             {planetsInHouse.map((p, i) => (
-                                <span key={i} className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${p === (isTa ? 'லக்' : 'ASC') ? 'bg-indigo-900 text-white' : 'text-slate-900 bg-slate-100'}`}>
-                                    {p}
+                                <span key={i} className={`text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${p.isLagna ? 'bg-indigo-900 text-white' : 'text-slate-900 bg-slate-100'}`}>
+                                    {p.name}
+                                    {p.degrees !== undefined && !p.isLagna && (
+                                        <sup className="text-[7px] opacity-70 font-medium">{Math.floor(p.degrees)}°</sup>
+                                    )}
                                 </span>
                             ))}
                         </div>

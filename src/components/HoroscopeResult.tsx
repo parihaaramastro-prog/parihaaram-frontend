@@ -316,7 +316,11 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                             <SouthIndianChart
                                 title={language === 'ta' ? "ராசி கட்டம்" : "Rasi Chart"}
                                 lagnaIdx={results.lagna.idx}
-                                planets={results.planets.map(p => ({ name: p.name, rasi_idx: p.rasi_idx }))}
+                                planets={results.planets.map(p => ({
+                                    name: p.name,
+                                    rasi_idx: p.rasi_idx,
+                                    degrees: p.degrees
+                                }))}
                                 language={language}
                             />
                         </div>
