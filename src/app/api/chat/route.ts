@@ -224,6 +224,7 @@ Nakshatra: ${c2.nakshatra?.name}
         console.log(`--- Using Model: ${selectedModel.toUpperCase()} ---`);
 
         if (selectedModel.startsWith('gemini')) {
+            console.log(`--- Using Model: GEMINI-3-PRO ---`);
             // --- GEMINI HANDLER ---
             const model = genAI.getGenerativeModel({
                 model: "gemini-1.5-pro",

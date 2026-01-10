@@ -627,7 +627,7 @@ export default function AdminDashboard() {
                                                     onClick={() => setAiModel('gemini-1.5-pro')}
                                                     className={`p-4 border rounded-xl cursor-pointer transition-all flex items-center justify-between ${aiModel === 'gemini-1.5-pro' ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
                                                 >
-                                                    <span className={`text-xs font-bold uppercase tracking-widest ${aiModel === 'gemini-1.5-pro' ? 'text-indigo-700' : 'text-slate-500'}`}>Gemini 1.5 Pro</span>
+                                                    <span className={`text-xs font-bold uppercase tracking-widest ${aiModel === 'gemini-1.5-pro' ? 'text-indigo-700' : 'text-slate-500'}`}>Gemini 3 Pro</span>
                                                     {aiModel === 'gemini-1.5-pro' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
                                                 </div>
                                             </div>
