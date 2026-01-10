@@ -225,50 +225,32 @@ Nakshatra: ${c2.nakshatra?.name}
 
         if (selectedModel.startsWith('gemini')) {
             console.log(`--- Using Model: GEMINI-3-PRO ---`);
-            try {
-                // --- GEMINI HANDLER ---
-                const model = genAI.getGenerativeModel({
-                    model: "gemini-1.5-pro",
-                    systemInstruction: systemPrompt,
-                });
+            // --- GEMINI HANDLER ---
+            const model = genAI.getGenerativeModel({
+                model: "gemini-1.5-pro",
+                systemInstruction: systemPrompt,
+            });
 
-                // Gemini Constraint: History MUST start with 'user'
-                let history = messages.slice(0, -1).map((m: any) => ({
-                    role: m.role === 'assistant' ? 'model' : 'user',
-                    parts: [{ text: m.content }]
-                }));
+            // Gemini Constraint: History MUST start with 'user'
+            let history = messages.slice(0, -1).map((m: any) => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: m.content }]
+            }));
 
-                if (history.length > 0 && history[0].role === 'model') {
-                    history.shift();
-                }
-
-                const chat = model.startChat({
-                    history: history,
-                    generationConfig: {
-                        maxOutputTokens: 500,
-                        temperature: temperature,
-                    },
-                });
-
-                const result = await chat.sendMessage(lastMessage);
-                reply = result.response.text();
-
-            } catch (geminiError: any) {
-                console.error("⚠️ GEMINI FAILURE (Falling back to GPT-4o):", geminiError.message);
-
-                // Fallback to OpenAI
-                const completion = await openai.chat.completions.create({
-                    model: "gpt-4o",
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        ...messages
-                    ],
-                    temperature: temperature,
-                    max_tokens: 500,
-                });
-
-                reply = completion.choices[0].message.content || "";
+            if (history.length > 0 && history[0].role === 'model') {
+                history.shift();
             }
+
+            const chat = model.startChat({
+                history: history,
+                generationConfig: {
+                    maxOutputTokens: 500,
+                    temperature: temperature,
+                },
+            });
+
+            const result = await chat.sendMessage(lastMessage);
+            reply = result.response.text();
 
         } else {
             // --- OPENAI HANDLER (Default) ---
