@@ -6,13 +6,14 @@ import {
     Users, Settings, ShieldCheck, Grid,
     Database, Activity, Search, Filter,
     ArrowUpRight, Loader2, UserPlus, UserCheck, CheckCircle2, Clock,
-    Mail, Shield, Trash2, MoreVertical, Info, AlertTriangle, X, MessageSquare, Briefcase, LogOut
+    Mail, Shield, Trash2, MoreVertical, Info, AlertTriangle, X, MessageSquare, Briefcase, LogOut, Coins
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { consultationService } from "@/lib/services/consultation";
 import { profileService, User } from "@/lib/services/profile";
 import { settingsService } from "@/lib/services/settings";
+import { creditService } from "@/lib/services/credits";
 
 export default function AdminDashboard() {
     const router = useRouter();
@@ -20,7 +21,15 @@ export default function AdminDashboard() {
     const [astrologers, setAstrologers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ total: 0, pending: 0, complete: 0 });
-    const [activeTab, setActiveTab] = useState<'consultations' | 'staff' | 'settings'>('consultations');
+    const [activeTab, setActiveTab] = useState<'consultations' | 'staff' | 'settings' | 'users'>('consultations');
+
+    // Users & Credits State
+    const [allUsers, setAllUsers] = useState<User[]>([]);
+    const [userCredits, setUserCredits] = useState<Record<string, number>>({});
+    const [usersTabSearch, setUsersTabSearch] = useState("");
+    const [selectedUserForCredits, setSelectedUserForCredits] = useState<User | null>(null);
+    const [newCreditBalance, setNewCreditBalance] = useState<number>(0);
+    const [updatingCredits, setUpdatingCredits] = useState(false);
 
     // Add Staff State
     const [searchEmail, setSearchEmail] = useState("");
@@ -44,12 +53,19 @@ export default function AdminDashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [conData, astroData] = await Promise.all([
+            const [conData, astroData, usersData, creditsData] = await Promise.all([
                 consultationService.getAllConsultations(),
-                profileService.getAstrologers()
+                profileService.getAstrologers(),
+                profileService.getAllUsers(),
+                creditService.getAllUserCredits()
             ]);
             setConsultations(conData);
             setAstrologers(astroData);
+            setAllUsers(usersData);
+
+            const creditMap: Record<string, number> = {};
+            creditsData.forEach((c: any) => { creditMap[c.user_id] = c.credits; });
+            setUserCredits(creditMap);
 
             const pending = conData.filter((c: any) => c.status === 'pending').length;
             const complete = conData.filter((c: any) => c.status === 'completed').length;
@@ -97,6 +113,21 @@ export default function AdminDashboard() {
         } catch (e: any) {
             console.error("Save Pricing Error:", e);
             alert(`Failed to save pricing: ${e.message || "Unknown error"}`);
+        }
+    };
+
+    const handleUpdateCredits = async () => {
+        if (!selectedUserForCredits) return;
+        setUpdatingCredits(true);
+        try {
+            await creditService.updateUserCredits(selectedUserForCredits.id, newCreditBalance);
+            setUserCredits(prev => ({ ...prev, [selectedUserForCredits.id]: newCreditBalance }));
+            setSelectedUserForCredits(null);
+            alert("Credits updated successfully.");
+        } catch (e: any) {
+            alert("Failed to update credits: " + e.message);
+        } finally {
+            setUpdatingCredits(false);
         }
     };
 
@@ -233,6 +264,12 @@ export default function AdminDashboard() {
                             className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'staff' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             Staff Management
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('users')}
+                            className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            Users
                         </button>
                         <button
                             onClick={() => setActiveTab('settings')}
@@ -557,6 +594,155 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
                         </motion.div>
+                    )}
+
+                    {activeTab === 'users' && (
+                        <motion.div
+                            key="users"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden"
+                        >
+                            <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-sm">
+                                        <Users className="w-5 h-5 text-indigo-600" />
+                                    </div>
+                                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">User Management</h2>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="relative group hidden md:block">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                        <input
+                                            value={usersTabSearch}
+                                            onChange={(e) => setUsersTabSearch(e.target.value)}
+                                            placeholder="Search Name, Email, ID..."
+                                            className="bg-white border border-slate-200 rounded-full py-2 pl-10 pr-4 text-[10px] font-bold uppercase tracking-widest focus:border-indigo-600 transition-all outline-none w-64 shadow-inner"
+                                        />
+                                    </div>
+                                    <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
+                                        <Loader2 className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 italic bg-slate-50/20">
+                                            <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">User Details</th>
+                                            <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Role</th>
+                                            <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Balance</th>
+                                            <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {allUsers
+                                            .filter(u =>
+                                                !usersTabSearch ||
+                                                (u.full_name?.toLowerCase().includes(usersTabSearch.toLowerCase()) ||
+                                                    u.email.toLowerCase().includes(usersTabSearch.toLowerCase()) ||
+                                                    u.id.includes(usersTabSearch))
+                                            )
+                                            .map((u) => (
+                                                <tr key={u.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="px-8 py-6">
+                                                        <div className="space-y-1">
+                                                            <p className="text-[13px] font-bold text-slate-900 uppercase tracking-tight">{u.full_name || 'Guest User'}</p>
+                                                            <p className="text-[10px] font-medium text-slate-400 flex items-center gap-2">
+                                                                <Mail className="w-3 h-3" /> {u.email}
+                                                            </p>
+                                                            <p className="text-[9px] font-mono text-slate-300">ID: {u.id}</p>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${u.role === 'admin' ? 'bg-purple-50 border-purple-100 text-purple-600' :
+                                                            u.role === 'astrologer' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
+                                                                'bg-slate-50 border-slate-100 text-slate-500'
+                                                            }`}>
+                                                            {u.role}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex items-center gap-2">
+                                                            <Coins className="w-4 h-4 text-amber-500" />
+                                                            <span className="text-sm font-bold text-slate-900">{userCredits[u.id] || 0}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-6 text-right">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedUserForCredits(u);
+                                                                setNewCreditBalance(userCredits[u.id] || 0);
+                                                            }}
+                                                            className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 hover:text-indigo-800 hover:underline"
+                                                        >
+                                                            Manage Credits
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Credit Management Modal */}
+                <AnimatePresence>
+                    {selectedUserForCredits && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                                className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
+                            >
+                                <div className="p-8 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <h2 className="text-lg font-bold text-slate-900 uppercase tracking-tighter">Adjust Wallet</h2>
+                                        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">{selectedUserForCredits.full_name}</p>
+                                    </div>
+                                    <button onClick={() => setSelectedUserForCredits(null)} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
+                                        <X className="w-5 h-5 text-slate-400" />
+                                    </button>
+                                </div>
+
+                                <div className="p-8 space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Credits Balance</label>
+                                        <div className="relative">
+                                            <Coins className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-amber-500" />
+                                            <input
+                                                type="number"
+                                                value={newCreditBalance}
+                                                onChange={(e) => setNewCreditBalance(Number(e.target.value))}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-xl font-bold text-slate-900 focus:border-indigo-600 transition-all outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4">
+                                        <button
+                                            onClick={() => setSelectedUserForCredits(null)}
+                                            className="flex-1 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleUpdateCredits}
+                                            disabled={updatingCredits}
+                                            className="flex-[2] bg-slate-900 hover:bg-indigo-600 text-white py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            {updatingCredits ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                                            Save Changes
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
                     )}
                 </AnimatePresence>
 

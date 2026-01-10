@@ -96,5 +96,16 @@ export const profileService = {
             .eq('id', userId);
 
         if (error) throw error;
+    },
+
+    async getAllUsers() {
+        const supabase = createClient();
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as User[];
     }
 };

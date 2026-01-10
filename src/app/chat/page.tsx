@@ -425,7 +425,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
     if (!mounted) return null;
 
     return (
-        <main className="fixed inset-x-0 bottom-0 top-[120px] md:top-[160px] bg-slate-50 flex flex-col items-center z-0 md:px-6">
+        <main className="fixed inset-x-0 bottom-0 top-[100px] md:top-[110px] bg-slate-50 flex flex-col items-center z-0 md:px-4">
 
             <ProfileSelectionModal
                 isOpen={isModalOpen}
@@ -604,7 +604,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                 </div>
             )}
 
-            <div className="flex-1 w-full max-w-[1400px] mx-auto flex relative overflow-hidden bg-white border border-indigo-500/30 md:border-0 md:shadow-2xl md:ring-1 md:ring-slate-900/5 md:my-6 md:rounded-[2.5rem] md:h-[calc(100%-3rem)]">
+            <div className="flex-1 w-full max-w-7xl mx-auto flex relative overflow-hidden bg-white border border-indigo-500/30 md:border-0 md:shadow-2xl md:ring-1 md:ring-slate-900/5 md:my-0 md:rounded-t-[2.5rem] md:h-full">
 
                 {/* Mobile Overlay Backdrop */}
                 <AnimatePresence>
@@ -787,7 +787,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     key={i}
-                                    className={`flex gap-3 sm:gap-4 max-w-[95%] sm:max-w-3xl ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
+                                    className={`flex gap-3 sm:gap-4 max-w-[90%] sm:max-w-2xl ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
                                 >
                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 ${msg.role === 'ai' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-600'}`}>
                                         {msg.role === 'ai' ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}

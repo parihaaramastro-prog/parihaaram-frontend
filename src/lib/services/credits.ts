@@ -75,5 +75,36 @@ export const creditService = {
         }
 
         return true;
+    },
+
+    async getUserCredits(userId: string): Promise<number> {
+        const supabase = createClient();
+        const { data, error } = await supabase
+            .from('user_credits')
+            .select('credits')
+            .eq('user_id', userId)
+            .single();
+
+        if (error) return 0;
+        return data?.credits || 0;
+    },
+
+    async getAllUserCredits(): Promise<UserCredits[]> {
+        const supabase = createClient();
+        const { data, error } = await supabase
+            .from('user_credits')
+            .select('*');
+
+        if (error) throw error;
+        return data as UserCredits[];
+    },
+
+    async updateUserCredits(userId: string, newBalance: number): Promise<void> {
+        const supabase = createClient();
+        const { error } = await supabase
+            .from('user_credits')
+            .upsert({ user_id: userId, credits: newBalance });
+
+        if (error) throw error;
     }
 };

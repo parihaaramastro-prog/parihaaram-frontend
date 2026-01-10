@@ -131,7 +131,8 @@ export default function AIAstrologerLanding() {
     };
 
     const saveAndRedirect = async (userId: string, data: typeof formData) => {
-        // 1. Update User Profile
+        // 1. Ensure User Profile Exists and Update
+        await profileService.ensureProfile();
         await profileService.updateProfile(userId, {
             full_name: data.name,
             birth_date: data.dob,

@@ -186,7 +186,7 @@ Rasi (Moon Sign): ${c.moon_sign.name}
 Nakshatra: ${c.nakshatra.name}
 Current Dasha: ${dasha?.planet || 'Unk'} (Ends: ${dasha?.end_date})
 Current Bhukti: ${bhukti?.planet || 'Unk'} (Ends: ${bhukti?.end_date})
-Planetary Positions: ${c.planets.map((p: any) => `${p.name} in ${p.rashi}`).join(', ')}
+Planetary Positions: ${c.planets.map((p: any) => `${p.name} in ${p.rashi} (House ${p.house})`).join(', ')}
 `;
             }
 
@@ -210,6 +210,12 @@ Nakshatra: ${c2.nakshatra.name}
         const temperature = isDecisionQuestion ? 0.4 : 0.7;
 
         // Call OpenAI
+        console.log("------------------------------------------------------------------");
+        console.log("System Prompt:", systemPrompt);
+        console.log("Messages:", JSON.stringify(messages, null, 2));
+        console.log("Temperature:", temperature);
+        console.log("------------------------------------------------------------------");
+
         const completion = await openai.chat.completions.create({
             model: "gpt-4o", // Strongest reasoning model
             messages: [
@@ -221,6 +227,9 @@ Nakshatra: ${c2.nakshatra.name}
         });
 
         const reply = completion.choices[0].message.content;
+
+        console.log("LLM Reply:", reply);
+        console.log("------------------------------------------------------------------");
 
         // 3. Deduct Credit
         const { data: updatedCredit } = await supabase
