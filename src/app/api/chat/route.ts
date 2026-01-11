@@ -218,19 +218,60 @@ Otherwise, answer the user's question directly based on the provided context.`;
                 const dasha = c.mahadashas?.find((m: any) => m.is_current);
                 const bhukti = dasha?.bhuktis?.find((b: any) => b.is_current);
 
+                // Helper to get Sign Index from Name (0=Aries, 11=Pisces)
+                const getSignIndex = (name: string | undefined | null): number => {
+                    if (!name) return -1;
+                    const n = name.toLowerCase().trim();
+                    if (n.includes('aries') || n.includes('mesha')) return 0;
+                    if (n.includes('taurus') || n.includes('vrish')) return 1;
+                    if (n.includes('gemini') || n.includes('mith')) return 2;
+                    if (n.includes('cancer') || n.includes('karka')) return 3;
+                    if (n.includes('leo') || n.includes('simha')) return 4;
+                    if (n.includes('virgo') || n.includes('kanya')) return 5;
+                    if (n.includes('libra') || n.includes('tula')) return 6;
+                    if (n.includes('scorpio') || n.includes('vrishchi')) return 7;
+                    if (n.includes('sagitt') || n.includes('dhanu')) return 8;
+                    if (n.includes('capri') || n.includes('makara')) return 9;
+                    if (n.includes('aquar') || n.includes('kumbha')) return 10;
+                    if (n.includes('pisces') || n.includes('meena')) return 11;
+                    return -1; // Unknown
+                };
+
+                const lagnaIdx = typeof c.lagna?.idx === 'number' ? c.lagna.idx : getSignIndex(c.lagna?.name || '');
+                const lagnaDegree = typeof c.lagna?.degrees === 'number' ? c.lagna.degrees.toFixed(2) : c.lagna?.degrees ?? '0';
+
+                console.log(`[AI Context] Lagna: ${c.lagna?.name} (Idx: ${lagnaIdx}) -> House 1 Reference`);
+
+                // Recalculate Planets with strict Whole Sign logic
+                const planetsContext = c.planets?.map((p: any) => {
+                    const idx = getSignIndex(p.rashi);
+                    let wsHouse = 0;
+                    if (idx !== -1 && lagnaIdx !== -1) {
+                        wsHouse = ((idx - lagnaIdx + 12) % 12) + 1;
+                    }
+                    const deg = typeof p.degrees === 'number' ? p.degrees.toFixed(2) : p.degrees;
+                    return `- ${p.name}: ${p.rashi} at ${deg}° (House ${wsHouse > 0 ? wsHouse : p.house + ' [Source]'} - Whole Sign)`;
+                }).join('\n');
+
                 systemPrompt += `\n\nActive Profile Context:
 Name: ${primaryProfile.name}
 Birth Details: ${primaryProfile.dob} at ${primaryProfile.tob} in ${primaryProfile.pob}
 Coordinates: ${primaryProfile.lat}, ${primaryProfile.lon}
-Lagna (Ascendant): ${c.lagna?.name} (Sign Index: ${c.lagna?.idx ?? 'Unk'}) at ${typeof c.lagna?.degrees === 'number' ? c.lagna.degrees.toFixed(2) : c.lagna?.degrees ?? '0'}°
+Lagna (Ascendant): ${c.lagna?.name} (Sign Index: ${lagnaIdx}) at ${lagnaDegree}°
+IMPORTANT REFERENCE: In this chart, ${c.lagna?.name} is the 1st House. Calculation starts from ${c.lagna?.name}.
+
 Rasi (Moon Sign): ${c.moon_sign?.name}
 Nakshatra: ${c.nakshatra?.name}
 Current Dasha: ${dasha?.planet || 'Unk'} (Ends: ${dasha?.end_date})
 Current Bhukti: ${bhukti?.planet || 'Unk'} (Ends: ${bhukti?.end_date})
-Planetary Positions (System: South Indian / Lahiri):
-${c.planets?.map((p: any) => `- ${p.name}: ${p.rashi} at ${typeof p.degrees === 'number' ? p.degrees.toFixed(2) : p.degrees}° (House ${p.house})`).join('\n')}
 
-IMPORTANT: Interpret charts using WHOLE SIGN HOUSES. If the 'House' number listed above conflicts with the Sign placement relative to the Ascendant, IGNORE the 'House' number and calculate the House based on the Sign (Rasi).
+Planetary Positions (Calculated Whole Sign Houses relative to ${c.lagna?.name}):
+${planetsContext}
+
+IMPORTANT: TRUST the 'House' column above. It is pre-calculated using strict WHOLE SIGN logic relative to the Ascendant.
+- Ascendant Sign (${c.lagna?.name}) = House 1.
+- Next Sign = House 2, etc.
+- Ignore any conflicting house information from your own training if it contradicts the list above.
 `;
             }
 

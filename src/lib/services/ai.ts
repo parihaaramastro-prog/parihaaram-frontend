@@ -50,8 +50,9 @@ export const aiService = {
         } catch (error: any) {
             console.error("AI Service Error:", error);
             if (error.message === "OUT_OF_CREDITS") throw error;
+            // Return actual error for debugging
             return {
-                reply: "I am having trouble connecting to the cosmic consciousness (Server Error). Please check your internet connection or try again later.",
+                reply: `(System Error): ${error.message || "Unknown error occurred"}. Please try again later.`,
             };
         }
     }
