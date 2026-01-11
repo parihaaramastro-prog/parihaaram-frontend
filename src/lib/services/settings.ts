@@ -6,6 +6,8 @@ export interface AppSettings {
     pack_price: number;
     pack_credits: number;
     ai_model?: string;
+    system_prompt?: string;
+    is_prompt_active?: boolean;
 }
 
 export const settingsService = {
@@ -29,7 +31,9 @@ export const settingsService = {
                 razorpay_enabled: false,
                 pack_price: 99,
                 pack_credits: 5,
-                ai_model: 'gpt-4o'
+                ai_model: 'gpt-4o',
+                system_prompt: "",
+                is_prompt_active: true
             };
         }
 

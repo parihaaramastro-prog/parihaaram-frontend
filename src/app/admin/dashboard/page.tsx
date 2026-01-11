@@ -6,7 +6,7 @@ import {
     Users, Settings, ShieldCheck, Grid,
     Database, Activity, Search, Filter,
     ArrowUpRight, Loader2, UserPlus, UserCheck, CheckCircle2, Clock,
-    Mail, Shield, Trash2, MoreVertical, Info, AlertTriangle, X, MessageSquare, Briefcase, LogOut, Coins
+    Mail, Shield, Trash2, MoreVertical, Info, AlertTriangle, X, MessageSquare, Briefcase, LogOut, Coins, Bot
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -24,7 +24,7 @@ export default function AdminDashboard() {
     const [astrologers, setAstrologers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ total: 0, pending: 0, complete: 0 });
-    const [activeTab, setActiveTab] = useState<'consultations' | 'staff' | 'settings' | 'users'>('consultations');
+    const [activeTab, setActiveTab] = useState<'consultations' | 'staff' | 'settings' | 'users' | 'ai-config'>('consultations');
 
     const [confirmationState, setConfirmationState] = useState<{
         isOpen: boolean;
@@ -64,6 +64,9 @@ export default function AdminDashboard() {
     const [packPrice, setPackPrice] = useState(49);
     const [packCredits, setPackCredits] = useState(10);
     const [aiModel, setAiModel] = useState<string>('gpt-4o');
+    const [systemPrompt, setSystemPrompt] = useState("");
+    const [isPromptActive, setIsPromptActive] = useState(true);
+    const [chatLogs, setChatLogs] = useState<any[]>([]);
 
     // Review State
     const [selectedReview, setSelectedReview] = useState<any | null>(null);
@@ -91,6 +94,10 @@ export default function AdminDashboard() {
             creditsData.forEach((c: any) => { creditMap[c.user_id] = c.credits; });
             setUserCredits(creditMap);
 
+            const supabase = createClient();
+            const { data: logs } = await supabase.from('chat_logs').select('*').order('created_at', { ascending: false }).limit(50);
+            setChatLogs(logs || []);
+
             const pending = conData.filter((c: any) => c.status === 'pending').length;
             const complete = conData.filter((c: any) => c.status === 'completed').length;
             setStats({ total: conData.length, pending, complete });
@@ -108,7 +115,11 @@ export default function AdminDashboard() {
             setRazorpayEnabled(s.razorpay_enabled);
             setPackPrice(s.pack_price);
             setPackCredits(s.pack_credits);
+            setPackCredits(s.pack_credits);
             if (s.ai_model) setAiModel(s.ai_model);
+            if (s.ai_model) setAiModel(s.ai_model);
+            if (s.system_prompt) setSystemPrompt(s.system_prompt);
+            if (s.is_prompt_active !== undefined) setIsPromptActive(s.is_prompt_active);
         }).catch(() => {
             // Siltently fail if settings table issue, defaults are used
             console.warn("Settings table might need update");
@@ -149,6 +160,31 @@ export default function AdminDashboard() {
             } else {
                 alert(`Failed to save model: ${e.message}`);
             }
+        }
+    };
+
+    const savePrompt = async () => {
+        try {
+            await settingsService.updateSettings({ system_prompt: systemPrompt });
+            alert("System Prompt updated successfully.");
+        } catch (e: any) {
+            console.error("Save Prompt Error:", e);
+            if (e.message.includes("column")) {
+                prompt("DATABASE SCHEMA UPDATE REQUIRED:\n\nCopy and run this SQL in your Supabase SQL Editor:",
+                    "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS system_prompt TEXT;");
+            } else {
+                alert(`Failed to save prompt: ${e.message}`);
+            }
+        }
+    };
+
+    const togglePromptActive = async () => {
+        try {
+            const newState = !isPromptActive;
+            setIsPromptActive(newState);
+            await settingsService.updateSettings({ is_prompt_active: newState });
+        } catch (e: any) {
+            alert("Settings Update Failed: " + e.message + "\n\nYou likely need to add 'is_prompt_active' column to your 'app_settings' table.");
         }
     };
 
@@ -320,6 +356,12 @@ export default function AdminDashboard() {
                             className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             Settings
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('ai-config')}
+                            className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'ai-config' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            AI Config
                         </button>
                         <div className="w-px h-6 bg-slate-200 mx-1 self-center" />
                         <button
@@ -675,8 +717,127 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
                         </motion.div>
-                    )
-                    }
+                    )}
+
+                    {activeTab === 'ai-config' && (
+                        <motion.div
+                            key="ai-config"
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden"
+                        >
+                            <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-sm">
+                                        <Bot className="w-5 h-5 text-indigo-600" />
+                                    </div>
+                                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">AI Brain & Logs</h2>
+                                </div>
+                                <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
+                                    <Loader2 className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
+                                </button>
+                            </div>
+
+                            <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                {/* Prompt Editor */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <h3 className="text-sm font-bold text-slate-900">System Prompt</h3>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-[10px] font-medium text-slate-400">Master instructions for the AI persona.</p>
+                                                {/* Toggle Switch */}
+                                                <button
+                                                    onClick={togglePromptActive}
+                                                    className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isPromptActive ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                                                    title={isPromptActive ? "Prompt is ACTIVE" : "Prompt is OFF (Raw Mode)"}
+                                                >
+                                                    <span className="sr-only">Toggle Prompt</span>
+                                                    <span
+                                                        aria-hidden="true"
+                                                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isPromptActive ? 'translate-x-4' : 'translate-x-0'}`}
+                                                    />
+                                                </button>
+                                                <span className={`text-[9px] font-bold uppercase tracking-wider ${isPromptActive ? 'text-indigo-600' : 'text-slate-400'}`}>
+                                                    {isPromptActive ? "Active" : "Disabled (Raw)"}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={savePrompt}
+                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"
+                                        >
+                                            Save Prompt
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        value={systemPrompt}
+                                        onChange={(e) => setSystemPrompt(e.target.value)}
+                                        className="w-full h-[600px] bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-xs text-slate-700 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none leading-relaxed resize-none"
+                                        placeholder="Enter system prompt here..."
+                                    />
+                                    <p className="text-[10px] text-slate-400 italic">
+                                        You can use variables like {'${currentDate}'} but mostly the context is injected automatically after this prompt.
+                                    </p>
+                                </div>
+
+                                {/* Chat Logs */}
+                                <div className="space-y-4 flex flex-col h-[700px]">
+                                    <div className="flex items-center justify-between shrink-0">
+                                        <div className="space-y-1">
+                                            <h3 className="text-sm font-bold text-slate-900">Recent Test Logs</h3>
+                                            <p className="text-[10px] font-medium text-slate-400">Live feed of AI interactions for debugging.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 bg-slate-900 rounded-xl overflow-hidden flex flex-col">
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
+                                            {chatLogs.length === 0 ? (
+                                                <div className="text-center p-10 text-slate-500 text-xs">No logs found. Ensure 'chat_logs' table exists.</div>
+                                            ) : (
+                                                chatLogs.map((log) => (
+                                                    <div key={log.id} className="bg-slate-800/50 rounded-lg p-4 space-y-3 border border-slate-700/50">
+                                                        <div className="flex items-center justify-between text-[10px] text-slate-500">
+                                                            <span className="font-mono text-indigo-400">{log.model}</span>
+                                                            <span>{new Date(log.created_at).toLocaleString()}</span>
+                                                        </div>
+
+                                                        <div className="space-y-1">
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase">User</p>
+                                                            <p className="text-xs text-slate-200 font-medium">{log.user_message}</p>
+                                                        </div>
+
+                                                        <div className="space-y-1 pl-2 border-l-2 border-indigo-500">
+                                                            <p className="text-[9px] font-bold text-indigo-400 uppercase">AI Reply</p>
+                                                            <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{log.ai_response}</p>
+                                                        </div>
+
+                                                        {log.context_snapshot && (
+                                                            <details className="text-[10px] text-slate-500 cursor-pointer">
+                                                                <summary className="hover:text-indigo-400 transition-colors">View Context Data</summary>
+                                                                <pre className="mt-2 p-2 bg-slate-950 rounded text-amber-500 overflow-x-auto">
+                                                                    {JSON.stringify(JSON.parse(log.context_snapshot), null, 2)}
+                                                                </pre>
+                                                            </details>
+                                                        )}
+                                                        {log.system_prompt_snapshot && (
+                                                            <details className="text-[10px] text-slate-500 cursor-pointer">
+                                                                <summary className="hover:text-indigo-400 transition-colors">View System Prompt Snapshot</summary>
+                                                                <div className="mt-2 p-2 bg-slate-950 rounded text-slate-400 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                                                                    {log.system_prompt_snapshot}
+                                                                </div>
+                                                            </details>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
 
                     {
                         activeTab === 'users' && (

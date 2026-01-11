@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 
         // Construct System Prompt
         const currentDate = new Date().toDateString();
-        let systemPrompt = `You are Parihaaram AI — a calm, senior life strategist powered by Vedic astrology logic.
+        const defaultPrompt = `You are Parihaaram AI — a calm, senior life strategist powered by Vedic astrology logic.
 Current Date: ${currentDate}.
 
 Your role is NOT to motivate, comfort, or reassure.
@@ -166,7 +166,11 @@ Provide a COMPREHENSIVE and DETAILED response:
 If the user is confused, break it down clearly but maintaining depth.
 Do NOT be brief. Be thorough and explanatory while remaining grounded.
 
-Ensure your response is complete and does not cut off. Structure your answer to fit within approximately 500 words.
+Ensure your response is complete and does not cut off.
+
+ADAPT YOUR RESPONSE LENGTH:
+- If the user asks a simple factual question (e.g., "What is my Rasi?"), keep it BRIEF and DIRECT (1-2 sentences).
+- If the user asks for analysis, advice, or predictions, provide the COMPREHENSIVE ~500-word deep dive.
 
 ━━━━━━━━━━━━━━━━━━
 PHILOSOPHY
@@ -183,6 +187,29 @@ do NOT soothe them emotionally.
 Ground them with deeply analyzed facts, patterns, and specific next actions.
 `;
 
+        // Determine if system prompt is active
+        const isPromptActive = (settings as any)?.is_prompt_active !== false;
+
+        let systemPrompt = "";
+
+        if (isPromptActive) {
+            systemPrompt = settings?.system_prompt || defaultPrompt;
+
+            // Allow dynamic date injection if the prompt from DB has the placeholder
+            systemPrompt = systemPrompt.replace("${currentDate}", currentDate);
+
+            if (!systemPrompt.includes("Current Date:")) {
+                systemPrompt = `Current Date: ${currentDate}.\n\n` + systemPrompt;
+            }
+        } else {
+            // Minimal prompt: RAW MODE
+            // "no prompt just data sending to ai model but in that if user asks anything about what ai you are please dont tell"
+            systemPrompt = `Current Date: ${currentDate}.
+You are a helpful assistant.
+PRIVACY CHECK: If the user asks about your underlying AI model (e.g. GPT, Gemini, Cluade) or your identity, do NOT reveal the model name. Simply state you are Parihaaram AI.
+Otherwise, answer the user's question directly based on the provided context.`;
+        }
+
         if (context) {
             const { primaryProfile, secondaryProfile } = context;
 
@@ -195,12 +222,15 @@ Ground them with deeply analyzed facts, patterns, and specific next actions.
 Name: ${primaryProfile.name}
 Birth Details: ${primaryProfile.dob} at ${primaryProfile.tob} in ${primaryProfile.pob}
 Coordinates: ${primaryProfile.lat}, ${primaryProfile.lon}
-Lagna (Ascendant): ${c.lagna?.name}
+Lagna (Ascendant): ${c.lagna?.name} (Sign Index: ${c.lagna?.idx ?? 'Unk'}) at ${typeof c.lagna?.degrees === 'number' ? c.lagna.degrees.toFixed(2) : c.lagna?.degrees ?? '0'}°
 Rasi (Moon Sign): ${c.moon_sign?.name}
 Nakshatra: ${c.nakshatra?.name}
 Current Dasha: ${dasha?.planet || 'Unk'} (Ends: ${dasha?.end_date})
 Current Bhukti: ${bhukti?.planet || 'Unk'} (Ends: ${bhukti?.end_date})
-Planetary Positions: ${c.planets?.map((p: any) => `${p.name} in ${p.rashi} (House ${p.house})`).join(', ')}
+Planetary Positions (System: South Indian / Lahiri):
+${c.planets?.map((p: any) => `- ${p.name}: ${p.rashi} at ${typeof p.degrees === 'number' ? p.degrees.toFixed(2) : p.degrees}° (House ${p.house})`).join('\n')}
+
+IMPORTANT: Interpret charts using WHOLE SIGN HOUSES. If the 'House' number listed above conflicts with the Sign placement relative to the Ascendant, IGNORE the 'House' number and calculate the House based on the Sign (Rasi).
 `;
             }
 
@@ -216,6 +246,11 @@ Nakshatra: ${c2.nakshatra?.name}
         }
 
         // Determine Temperature
+        console.log("------------------------------------------------------------------");
+        console.log("--- SYSTEM PROMPT & CONTEXT ---");
+        console.log(systemPrompt);
+        console.log("------------------------------------------------------------------");
+
         const lastMessage = messages[messages.length - 1]?.content || "";
         const isDecisionQuestion = lastMessage.includes("?") ||
             lastMessage.toLowerCase().startsWith("should") ||
@@ -252,11 +287,11 @@ Nakshatra: ${c2.nakshatra?.name}
                 reply = response.text || "";
             } catch (flashError: any) {
                 console.error("⚠️ GEMINI 2.5 FLASH FAILED:", flashError.message);
-                console.log("🔄 Retrying with GEMINI-1.5-FLASH...");
+                console.log("🔄 Retrying with GEMINI-1.5-FLASH-001...");
 
                 try {
                     const fallbackResponse = await genAI.models.generateContent({
-                        model: "gemini-1.5-flash",
+                        model: "gemini-1.5-flash-001",
                         contents: contents,
                         config: {
                             systemInstruction: systemPrompt,
@@ -289,6 +324,18 @@ Nakshatra: ${c2.nakshatra?.name}
 
         console.log("LLM Reply:", reply);
         console.log("------------------------------------------------------------------");
+
+        // Log to DB (Fire and forget, don't await blocking)
+        supabase.from('chat_logs').insert({
+            user_id: user.id,
+            model: selectedModel,
+            user_message: lastMessage,
+            ai_response: reply,
+            system_prompt_snapshot: systemPrompt,
+            context_snapshot: JSON.stringify(context || {})
+        }).then(({ error }) => {
+            if (error) console.warn("Failed to log chat:", error.message);
+        });
 
         // 4. Deduct Credit
         const { data: updatedCredit } = await supabase

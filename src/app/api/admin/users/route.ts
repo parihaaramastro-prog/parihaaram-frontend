@@ -2,19 +2,28 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 
 // Admin Client to bypass RLS and manage Auth users
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
+// function to get admin client safely
+const getSupabaseAdmin = () => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !key) {
+        return null;
+    }
+
+    return createClient(url, key, {
         auth: {
             autoRefreshToken: false,
             persistSession: false
         }
-    }
-);
+    });
+};
+
+const supabaseAdmin = getSupabaseAdmin();
 
 export async function GET(req: NextRequest) {
     try {
+        if (!supabaseAdmin) throw new Error("MISSING_ENV: SUPABASE_SERVICE_ROLE_KEY");
         const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
         if (error) throw error;
 
@@ -38,6 +47,8 @@ export async function GET(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
     try {
         const { userId } = await req.json();
+
+        if (!supabaseAdmin) throw new Error("MISSING_ENV: SUPABASE_SERVICE_ROLE_KEY");
 
         // 1. Delete from Auth (this usually cascades if set up, but let's be sure)
         const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -63,6 +74,8 @@ export async function DELETE(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const { action, userId, email } = await req.json();
+
+        if (!supabaseAdmin) throw new Error("MISSING_ENV: SUPABASE_SERVICE_ROLE_KEY");
 
         if (action === 'block') {
             const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {

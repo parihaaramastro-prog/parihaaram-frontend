@@ -38,7 +38,8 @@ export const aiService = {
             }
 
             if (!response.ok) {
-                throw new Error("Failed to reach AI server");
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Server Error: ${response.status}`);
             }
 
             return {

@@ -425,7 +425,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
     if (!mounted) return null;
 
     return (
-        <main className="fixed inset-x-0 bottom-0 top-[100px] md:top-[110px] bg-slate-50 flex flex-col items-center z-0 md:px-4">
+        <main className="fixed inset-x-0 bottom-0 top-[70px] md:top-[110px] bg-slate-50 flex flex-col items-center z-0 md:px-4 h-[calc(100dvh-70px)] md:h-auto">
 
             <ProfileSelectionModal
                 isOpen={isModalOpen}
@@ -592,12 +592,21 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                 >
                                     {(credits ?? 0) <= 0 ? `Pay ₹${packConfig.price} to Continue` : `Add ${packConfig.credits} Credits (₹${packConfig.price})`}
                                 </button>
-                                <button
-                                    onClick={() => setShowPayModal(false)}
-                                    className="mt-3 text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors"
-                                >
-                                    {(credits ?? 0) <= 0 ? "Maybe Later" : "Close"}
-                                </button>
+                                {(credits ?? 0) > 0 ? (
+                                    <button
+                                        onClick={() => setShowPayModal(false)}
+                                        className="mt-3 text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                                    >
+                                        Close
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => router.push('/dashboard')}
+                                        className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-indigo-600 transition-colors"
+                                    >
+                                        Back to Dashboard
+                                    </button>
+                                )}
                             </>
                         )}
                     </motion.div>
@@ -722,13 +731,13 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                         </div>
 
                         {/* Active Context Bar */}
-                        <div className="px-4 md:px-6 pb-3 pt-0 flex flex-wrap gap-2 items-center">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2">Context:</span>
+                        <div className="px-4 md:px-6 pb-3 pt-0 flex overflow-x-auto gap-2 items-center flex-nowrap scrollbar-hide">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2 shrink-0 hidden xs:block">Context:</span>
 
                             {/* Primary Profile */}
                             <button
                                 onClick={() => openProfileSelector('primary')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${primaryProfile ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-600'}`}
+                                className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${primaryProfile ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-600'}`}
                             >
                                 <User className="w-3.5 h-3.5" />
                                 {primaryProfile ? primaryProfile.name : "Select Profile"}
@@ -737,10 +746,10 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                             {/* Secondary Profile (Only if primary selected) */}
                             {primaryProfile && (
                                 <>
-                                    <span className="text-slate-300 text-[10px]">&</span>
+                                    <span className="text-slate-300 text-[10px] shrink-0">&</span>
                                     <button
                                         onClick={() => openProfileSelector('secondary')}
-                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${secondaryProfile ? 'bg-pink-50 border-pink-200 text-pink-900' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-pink-300 hover:text-pink-600'}`}
+                                        className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${secondaryProfile ? 'bg-pink-50 border-pink-200 text-pink-900' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-pink-300 hover:text-pink-600'}`}
                                     >
                                         <Users className="w-3.5 h-3.5" />
                                         {secondaryProfile ? secondaryProfile.name : "Add Partner"}
