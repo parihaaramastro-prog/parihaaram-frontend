@@ -244,13 +244,15 @@ Otherwise, answer the user's question directly based on the provided context.`;
 
                 // Recalculate Planets with strict Whole Sign logic
                 const planetsContext = c.planets?.map((p: any) => {
-                    const idx = getSignIndex(p.rashi);
+                    // Check both 'rashi' and 'sign' properties as the backend format might vary
+                    const signName = p.rashi || p.sign || p.sign_name || "Unknown";
+                    const idx = getSignIndex(signName);
                     let wsHouse = 0;
                     if (idx !== -1 && lagnaIdx !== -1) {
                         wsHouse = ((idx - lagnaIdx + 12) % 12) + 1;
                     }
                     const deg = typeof p.degrees === 'number' ? p.degrees.toFixed(2) : p.degrees;
-                    return `- ${p.name}: ${p.rashi} at ${deg}° (House ${wsHouse > 0 ? wsHouse : p.house + ' [Source]'} - Whole Sign)`;
+                    return `- ${p.name}: ${signName} at ${deg}° (House ${wsHouse > 0 ? wsHouse : p.house + ' [Source]'} - Whole Sign)`;
                 }).join('\n');
 
                 systemPrompt += `\n\nActive Profile Context:
@@ -328,24 +330,7 @@ Nakshatra: ${c2.nakshatra?.name}
                 reply = response.text || "";
             } catch (flashError: any) {
                 console.error("⚠️ GEMINI 2.5 FLASH FAILED:", flashError.message);
-                console.log("🔄 Retrying with GEMINI-1.5-FLASH-001...");
-
-                try {
-                    const fallbackResponse = await genAI.models.generateContent({
-                        model: "gemini-1.5-flash-001",
-                        contents: contents,
-                        config: {
-                            systemInstruction: systemPrompt,
-                            temperature: temperature,
-                            maxOutputTokens: 4000,
-                        },
-                    });
-                    reply = fallbackResponse.text || "";
-
-                } catch (proError: any) {
-                    console.error("❌ ALL GEMINI MODELS FAILED:", proError.message);
-                    throw proError;
-                }
+                throw flashError;
             }
 
         } else {
