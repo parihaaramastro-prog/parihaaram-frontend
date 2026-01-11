@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { OpenAI } from "openai";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
@@ -11,7 +11,7 @@ const openai = new OpenAI({
 });
 
 // Initialize Gemini client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function POST(req: NextRequest) {
     try {
@@ -151,19 +151,22 @@ STRICTLY AVOID
 - Remedies unless explicitly asked
 - Spiritual clichés
 - Excessive empathy
-- Overlong answers
 
 ━━━━━━━━━━━━━━━━━━
-ANSWER STRUCTURE (IMPORTANT)
+ANSWER STRUCTURE
 ━━━━━━━━━━━━━━━━━━
 
-Prefer this structure:
-- Short direct answer
-- Explanation (why)
-- What to do now
-- What to avoid
+Provide a COMPREHENSIVE and DETAILED response:
+- Direct Answer (Clear YES/NO if applicable)
+- Detailed Analysis (Why this is happening based on the stars)
+- Strategic Guidance (What to do, step-by-step)
+- Cautions (What to avoid specifically)
+- Timeline (When to act, when to wait)
 
-If the user is confused, help them simplify — not explore more options.
+If the user is confused, break it down clearly but maintaining depth.
+Do NOT be brief. Be thorough and explanatory while remaining grounded.
+
+Ensure your response is complete and does not cut off. Structure your answer to fit within approximately 500 words.
 
 ━━━━━━━━━━━━━━━━━━
 PHILOSOPHY
@@ -177,7 +180,7 @@ Life improves with alignment, not speed.”
 IMPORTANT:
 If the user is anxious or comparing themselves to others,
 do NOT soothe them emotionally.
-Ground them with facts, patterns, and next actions.
+Ground them with deeply analyzed facts, patterns, and specific next actions.
 `;
 
         if (context) {
@@ -224,36 +227,50 @@ Nakshatra: ${c2.nakshatra?.name}
         console.log(`--- Using Model: ${selectedModel.toUpperCase()} ---`);
 
         if (selectedModel.startsWith('gemini')) {
-            console.log(`--- Using Model: GEMINI-3-PRO ---`);
+            console.log(`--- Using Model: GEMINI-2.5-FLASH ---`);
             // --- GEMINI HANDLER ---
-            const apiKey = process.env.GEMINI_API_KEY;
-            console.log("DEBUG: Gemini Key being used starts with:", apiKey?.substring(0, 10));
 
-            const model = genAI.getGenerativeModel({
-                model: "gemini-1.5-flash", // Switching to Flash for better stability/availability
-                systemInstruction: systemPrompt,
-            });
+            // Map messages to Gemini Content format
+            const contents = messages
+                .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+                .map((m: any) => ({
+                    role: m.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: m.content }]
+                }));
 
-            // Gemini Constraint: History MUST start with 'user'
-            let history = messages.slice(0, -1).map((m: any) => ({
-                role: m.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: m.content }]
-            }));
+            try {
+                const response = await genAI.models.generateContent({
+                    model: "gemini-2.5-flash",
+                    contents: contents,
+                    config: {
+                        systemInstruction: systemPrompt,
+                        temperature: temperature,
+                        maxOutputTokens: 4000,
+                    },
+                });
 
-            if (history.length > 0 && history[0].role === 'model') {
-                history.shift();
+                reply = response.text || "";
+            } catch (flashError: any) {
+                console.error("⚠️ GEMINI 2.5 FLASH FAILED:", flashError.message);
+                console.log("🔄 Retrying with GEMINI-1.5-FLASH...");
+
+                try {
+                    const fallbackResponse = await genAI.models.generateContent({
+                        model: "gemini-1.5-flash",
+                        contents: contents,
+                        config: {
+                            systemInstruction: systemPrompt,
+                            temperature: temperature,
+                            maxOutputTokens: 4000,
+                        },
+                    });
+                    reply = fallbackResponse.text || "";
+
+                } catch (proError: any) {
+                    console.error("❌ ALL GEMINI MODELS FAILED:", proError.message);
+                    throw proError;
+                }
             }
-
-            const chat = model.startChat({
-                history: history,
-                generationConfig: {
-                    maxOutputTokens: 500,
-                    temperature: temperature,
-                },
-            });
-
-            const result = await chat.sendMessage(lastMessage);
-            reply = result.response.text();
 
         } else {
             // --- OPENAI HANDLER (Default) ---

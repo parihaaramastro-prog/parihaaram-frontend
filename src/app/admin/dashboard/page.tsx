@@ -15,6 +15,9 @@ import { profileService, User } from "@/lib/services/profile";
 import { settingsService } from "@/lib/services/settings";
 import { creditService } from "@/lib/services/credits";
 
+import Link from "next/link";
+import ConfirmationModal from "@/components/ConfirmationModal";
+
 export default function AdminDashboard() {
     const router = useRouter();
     const [consultations, setConsultations] = useState<any[]>([]);
@@ -22,6 +25,22 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ total: 0, pending: 0, complete: 0 });
     const [activeTab, setActiveTab] = useState<'consultations' | 'staff' | 'settings' | 'users'>('consultations');
+
+    const [confirmationState, setConfirmationState] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        isDestructive?: boolean;
+        confirmText?: string;
+    }>({
+        isOpen: false,
+        title: "",
+        message: "",
+        onConfirm: () => { },
+        isDestructive: false,
+        confirmText: "Confirm"
+    });
 
     // Users & Credits State
     const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -219,14 +238,22 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleRemoveStaff = async (id: string) => {
-        if (!confirm("Revoke all consultant clearances for this member?")) return;
-        try {
-            await profileService.updateRole(id, 'customer');
-            fetchData();
-        } catch (err) {
-            alert("Failed to revoke clearance.");
-        }
+    const handleRemoveStaff = (id: string) => {
+        setConfirmationState({
+            isOpen: true,
+            title: "Revoke Consultant Clearance",
+            message: "Are you sure you want to revoke all consultant clearances for this member?",
+            isDestructive: true,
+            confirmText: "Revoke Access",
+            onConfirm: async () => {
+                try {
+                    await profileService.updateRole(id, 'customer');
+                    fetchData();
+                } catch (err) {
+                    alert("Failed to revoke clearance.");
+                }
+            }
+        });
     };
 
     const handleOpenReview = (con: any) => {
@@ -629,11 +656,11 @@ export default function AdminDashboard() {
                                                 </div>
 
                                                 <div
-                                                    onClick={() => setAiModel('gemini-1.5-pro')}
-                                                    className={`p-4 border rounded-xl cursor-pointer transition-all flex items-center justify-between ${aiModel === 'gemini-1.5-pro' ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
+                                                    onClick={() => setAiModel('gemini-2.5-flash')}
+                                                    className={`p-4 border rounded-xl cursor-pointer transition-all flex items-center justify-between ${aiModel === 'gemini-2.5-flash' ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
                                                 >
-                                                    <span className={`text-xs font-bold uppercase tracking-widest ${aiModel === 'gemini-1.5-pro' ? 'text-indigo-700' : 'text-slate-500'}`}>Gemini 3 Pro</span>
-                                                    {aiModel === 'gemini-1.5-pro' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                                                    <span className={`text-xs font-bold uppercase tracking-widest ${aiModel === 'gemini-2.5-flash' ? 'text-indigo-700' : 'text-slate-500'}`}>Gemini 2.5 Flash</span>
+                                                    {aiModel === 'gemini-2.5-flash' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
                                                 </div>
                                             </div>
 
@@ -753,23 +780,31 @@ export default function AdminDashboard() {
 
                                                                 <button
                                                                     onClick={async () => {
-                                                                        if (!confirm(`Generate a secure login link for ${u.email}?`)) return;
-                                                                        try {
-                                                                            const res = await fetch('/api/admin/users', {
-                                                                                method: 'POST',
-                                                                                headers: { 'Content-Type': 'application/json' },
-                                                                                body: JSON.stringify({ action: 'magic_link', email: u.email })
-                                                                            });
-                                                                            const data = await res.json();
-                                                                            if (data.link) {
-                                                                                window.open(data.link, '_blank');
-                                                                                alert("User accessed in new tab via Magic Link.");
-                                                                            } else {
-                                                                                throw new Error(data.error);
+                                                                        setConfirmationState({
+                                                                            isOpen: true,
+                                                                            title: "Generate Magic Link",
+                                                                            message: `Generate a secure login link for ${u.email}? This will allow you to log in as them immediately.`,
+                                                                            isDestructive: false,
+                                                                            confirmText: "Generate Link",
+                                                                            onConfirm: async () => {
+                                                                                try {
+                                                                                    const res = await fetch('/api/admin/users', {
+                                                                                        method: 'POST',
+                                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                                        body: JSON.stringify({ action: 'magic_link', email: u.email })
+                                                                                    });
+                                                                                    const data = await res.json();
+                                                                                    if (data.link) {
+                                                                                        window.open(data.link, '_blank');
+                                                                                        // alert("User accessed in new tab via Magic Link."); // Keeping it non-intrusive
+                                                                                    } else {
+                                                                                        throw new Error(data.error);
+                                                                                    }
+                                                                                } catch (e: any) {
+                                                                                    alert("Access failed: " + e.message);
+                                                                                }
                                                                             }
-                                                                        } catch (e: any) {
-                                                                            alert("Access failed: " + e.message);
-                                                                        }
+                                                                        });
                                                                     }}
                                                                     className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                                                                     title="Access Account (Magic Link)"
@@ -779,17 +814,25 @@ export default function AdminDashboard() {
 
                                                                 <button
                                                                     onClick={async () => {
-                                                                        if (!confirm(`Are you sure you want to BLOCK ${u.email}? They will not be able to login.`)) return;
-                                                                        try {
-                                                                            await fetch('/api/admin/users', {
-                                                                                method: 'POST',
-                                                                                headers: { 'Content-Type': 'application/json' },
-                                                                                body: JSON.stringify({ action: 'block', userId: u.id })
-                                                                            });
-                                                                            alert("User blocked.");
-                                                                        } catch (e) {
-                                                                            alert("Failed to block.");
-                                                                        }
+                                                                        setConfirmationState({
+                                                                            isOpen: true,
+                                                                            title: "Block User Account",
+                                                                            message: `Are you sure you want to BLOCK ${u.email}? They will not be able to log in.`,
+                                                                            isDestructive: true,
+                                                                            confirmText: "Block User",
+                                                                            onConfirm: async () => {
+                                                                                try {
+                                                                                    await fetch('/api/admin/users', {
+                                                                                        method: 'POST',
+                                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                                        body: JSON.stringify({ action: 'block', userId: u.id })
+                                                                                    });
+                                                                                    alert("User blocked.");
+                                                                                } catch (e) {
+                                                                                    alert("Failed to block.");
+                                                                                }
+                                                                            }
+                                                                        });
                                                                     }}
                                                                     className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                                                     title="Block Account"
@@ -973,6 +1016,16 @@ export default function AdminDashboard() {
                     }
                 </AnimatePresence >
             </div >
+
+            <ConfirmationModal
+                isOpen={confirmationState.isOpen}
+                onClose={() => setConfirmationState(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmationState.onConfirm}
+                title={confirmationState.title}
+                message={confirmationState.message}
+                isDestructive={confirmationState.isDestructive}
+                confirmText={confirmationState.confirmText}
+            />
         </main >
     );
 }
