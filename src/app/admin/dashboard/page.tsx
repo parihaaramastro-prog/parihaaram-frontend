@@ -67,6 +67,9 @@ export default function AdminDashboard() {
     const [systemPrompt, setSystemPrompt] = useState("");
     const [isPromptActive, setIsPromptActive] = useState(true);
     const [chatLogs, setChatLogs] = useState<any[]>([]);
+    const [selectedLog, setSelectedLog] = useState<any | null>(null);
+    const [logSearch, setLogSearch] = useState("");
+    const [logFilterUser, setLogFilterUser] = useState<string>("all");
 
     // Review State
     const [selectedReview, setSelectedReview] = useState<any | null>(null);
@@ -95,7 +98,9 @@ export default function AdminDashboard() {
             setUserCredits(creditMap);
 
             const supabase = createClient();
-            const { data: logs } = await supabase.from('chat_logs').select('*').order('created_at', { ascending: false }).limit(50);
+            // Join with auth.users to get emails if possible, but RLS might block foreign table join if not careful.
+            // Simpler: Fetch logs, and we map User IDs to Emails from 'allUsers' state on the client side.
+            const { data: logs } = await supabase.from('chat_logs').select('*').order('created_at', { ascending: false }).limit(100);
             setChatLogs(logs || []);
 
             const pending = conData.filter((c: any) => c.status === 'pending').length;
@@ -782,59 +787,163 @@ export default function AdminDashboard() {
                                     </p>
                                 </div>
 
-                                {/* Chat Logs */}
+                                {/* Chat Logs Section */}
                                 <div className="space-y-4 flex flex-col h-[700px]">
-                                    <div className="flex items-center justify-between shrink-0">
+                                    <div className="flex flex-col gap-3 shrink-0">
                                         <div className="space-y-1">
                                             <h3 className="text-sm font-bold text-slate-900">Recent Test Logs</h3>
-                                            <p className="text-[10px] font-medium text-slate-400">Live feed of AI interactions for debugging.</p>
+                                            <p className="text-[10px] font-medium text-slate-400">Live feed of AI interactions.</p>
+                                        </div>
+
+                                        {/* Log Filters */}
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative flex-1">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                                <input
+                                                    placeholder="Search logs..."
+                                                    value={logSearch}
+                                                    onChange={(e) => setLogSearch(e.target.value)}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-9 pr-4 text-[10px] font-medium focus:border-indigo-600 transition-all outline-none"
+                                                />
+                                            </div>
+                                            <select
+                                                value={logFilterUser}
+                                                onChange={(e) => setLogFilterUser(e.target.value)}
+                                                className="bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-[10px] font-bold uppercase tracking-widest focus:border-indigo-600 outline-none max-w-[150px]"
+                                            >
+                                                <option value="all">All Users</option>
+                                                {/* Unique users from logs */}
+                                                {Array.from(new Set(chatLogs.map(l => l.user_id))).map(uid => {
+                                                    const u = allUsers.find(au => au.id === uid);
+                                                    return (
+                                                        <option key={uid} value={uid}>
+                                                            {u ? (u.full_name || u.email) : uid.slice(0, 8) + '...'}
+                                                        </option>
+                                                    );
+                                                })}
+                                            </select>
                                         </div>
                                     </div>
 
                                     <div className="flex-1 bg-slate-900 rounded-xl overflow-hidden flex flex-col">
-                                        <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
+                                        <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-thin scrollbar-thumb-slate-700">
                                             {chatLogs.length === 0 ? (
-                                                <div className="text-center p-10 text-slate-500 text-xs">No logs found. Ensure 'chat_logs' table exists.</div>
+                                                <div className="text-center p-10 text-slate-500 text-xs">No logs found.</div>
                                             ) : (
-                                                chatLogs.map((log) => (
-                                                    <div key={log.id} className="bg-slate-800/50 rounded-lg p-4 space-y-3 border border-slate-700/50">
-                                                        <div className="flex items-center justify-between text-[10px] text-slate-500">
-                                                            <span className="font-mono text-indigo-400">{log.model}</span>
-                                                            <span>{new Date(log.created_at).toLocaleString()}</span>
-                                                        </div>
-
-                                                        <div className="space-y-1">
-                                                            <p className="text-[9px] font-bold text-slate-400 uppercase">User</p>
-                                                            <p className="text-xs text-slate-200 font-medium">{log.user_message}</p>
-                                                        </div>
-
-                                                        <div className="space-y-1 pl-2 border-l-2 border-indigo-500">
-                                                            <p className="text-[9px] font-bold text-indigo-400 uppercase">AI Reply</p>
-                                                            <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{log.ai_response}</p>
-                                                        </div>
-
-                                                        {log.context_snapshot && (
-                                                            <details className="text-[10px] text-slate-500 cursor-pointer">
-                                                                <summary className="hover:text-indigo-400 transition-colors">View Context Data</summary>
-                                                                <pre className="mt-2 p-2 bg-slate-950 rounded text-amber-500 overflow-x-auto">
-                                                                    {JSON.stringify(JSON.parse(log.context_snapshot), null, 2)}
-                                                                </pre>
-                                                            </details>
-                                                        )}
-                                                        {log.system_prompt_snapshot && (
-                                                            <details className="text-[10px] text-slate-500 cursor-pointer">
-                                                                <summary className="hover:text-indigo-400 transition-colors">View System Prompt Snapshot</summary>
-                                                                <div className="mt-2 p-2 bg-slate-950 rounded text-slate-400 whitespace-pre-wrap max-h-40 overflow-y-auto">
-                                                                    {log.system_prompt_snapshot}
+                                                chatLogs
+                                                    .filter(log => {
+                                                        const user = allUsers.find(u => u.id === log.user_id);
+                                                        const userName = user?.full_name || user?.email || "Unknown";
+                                                        const searchContent = (log.user_message + log.ai_response + userName).toLowerCase();
+                                                        const matchesSearch = searchContent.includes(logSearch.toLowerCase());
+                                                        const matchesUser = logFilterUser === 'all' || log.user_id === logFilterUser;
+                                                        return matchesSearch && matchesUser;
+                                                    })
+                                                    .map((log) => {
+                                                        const user = allUsers.find(u => u.id === log.user_id);
+                                                        return (
+                                                            <div
+                                                                key={log.id}
+                                                                onClick={() => setSelectedLog(log)}
+                                                                className="bg-slate-800/50 hover:bg-slate-800 cursor-pointer rounded-lg p-3 border border-slate-700/50 transition-colors group"
+                                                            >
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px] text-indigo-400 font-bold uppercase">
+                                                                            {user?.email?.[0] || "?"}
+                                                                        </div>
+                                                                        <span className="text-[10px] font-bold text-slate-300">
+                                                                            {user?.full_name || user?.email || "Unknown User"}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-[9px] font-mono text-slate-500">{new Date(log.created_at).toLocaleTimeString()}</span>
                                                                 </div>
-                                                            </details>
-                                                        )}
-                                                    </div>
-                                                ))
+
+                                                                <p className="text-[11px] text-slate-400 line-clamp-2 pl-7 group-hover:text-slate-300 transition-colors">
+                                                                    <span className="text-indigo-500 font-mono text-[9px] mr-1">USR:</span>
+                                                                    {log.user_message}
+                                                                </p>
+                                                            </div>
+                                                        );
+                                                    })
                                             )}
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Log Details Modal */}
+                                <AnimatePresence>
+                                    {selectedLog && (
+                                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                                            <motion.div
+                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.95 }}
+                                                className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
+                                            >
+                                                {/* Header */}
+                                                <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                                                    <div>
+                                                        <h3 className="text-lg font-bold text-slate-900">Interaction Details</h3>
+                                                        <p className="text-xs text-slate-500 font-mono">ID: {selectedLog.id} • {selectedLog.model} • {new Date(selectedLog.created_at).toLocaleString()}</p>
+                                                    </div>
+                                                    <button onClick={() => setSelectedLog(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                                                        <X className="w-5 h-5 text-slate-500" />
+                                                    </button>
+                                                </div>
+
+                                                {/* Content */}
+                                                <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                                                    {/* User Message */}
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="p-1.5 bg-indigo-100 rounded-md">
+                                                                <Users className="w-4 h-4 text-indigo-700" />
+                                                            </div>
+                                                            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">User Query</span>
+                                                        </div>
+                                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-800 leading-relaxed font-medium">
+                                                            {selectedLog.user_message}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* AI Response */}
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="p-1.5 bg-emerald-100 rounded-md">
+                                                                <Bot className="w-4 h-4 text-emerald-700" />
+                                                            </div>
+                                                            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Parihaaram Response</span>
+                                                        </div>
+                                                        <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
+                                                            {selectedLog.ai_response}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Meta Details */}
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="space-y-2">
+                                                            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Context Data</span>
+                                                            <div className="bg-slate-900 rounded-xl p-4 overflow-auto max-h-60 border border-slate-800">
+                                                                <pre className="text-[10px] text-amber-500 font-mono whitespace-pre-wrap">
+                                                                    {selectedLog.context_snapshot ? JSON.stringify(JSON.parse(selectedLog.context_snapshot), null, 2) : "No context captured."}
+                                                                </pre>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">System Prompt Snapshot</span>
+                                                            <div className="bg-slate-900 rounded-xl p-4 overflow-auto max-h-60 border border-slate-800">
+                                                                <pre className="text-[10px] text-slate-400 font-mono whitespace-pre-wrap">
+                                                                    {selectedLog.system_prompt_snapshot || "No prompt snapshot."}
+                                                                </pre>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        </div>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         </motion.div>
                     )}
