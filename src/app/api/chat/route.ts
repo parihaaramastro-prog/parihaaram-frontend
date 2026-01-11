@@ -316,7 +316,7 @@ Nakshatra: ${c2.nakshatra?.name}
                     ...messages
                 ],
                 temperature: temperature,
-                max_tokens: 500,
+                max_tokens: 4000,
             });
 
             reply = completion.choices[0].message.content || "";
