@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Cardo } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import SessionTimeout from "@/components/SessionTimeout";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const serif = Cardo({ weight: ["400", "700"], subsets: ["latin"], variable: "--font-serif" });
@@ -28,6 +29,7 @@ export default function RootLayout({
         <html lang="en">
             <body className={`${inter.variable} ${serif.variable} font-sans antialiased min-h-screen`}>
                 <div className="app-bg-mesh" />
+                <SessionTimeout />
                 <Navbar />
                 <main className="pt-32 md:pt-40 min-h-screen">
                     {children}
