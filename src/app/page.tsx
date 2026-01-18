@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import AuthModal from "@/components/AuthModal";
 import { createClient } from "@/lib/supabase";
+import { AstrologyResults } from "@/lib/astrology";
 import { useRouter } from "next/navigation";
 import UserProfileDropdown from "@/components/UserProfileDropdown";
 
