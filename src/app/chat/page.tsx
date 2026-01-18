@@ -4,35 +4,20 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import {
     Send, Bot, User, ArrowLeft, Globe,
     Lightbulb, MoreHorizontal, ArrowUp, Sidebar, CircleUser,
-    Plus, MessageSquare, Trash2, X, Sparkles, Users, Briefcase, Heart, Activity, Coins, Check
+    Plus, MessageSquare, Trash2, X, Sparkles, Users, Briefcase, Heart, Activity, Coins, Check, Loader2
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { SavedHoroscope, horoscopeService } from "@/lib/services/horoscope";
-import { aiService, ChatIntent } from "@/lib/services/ai";
+import { aiService } from "@/lib/services/ai";
 import { creditService } from "@/lib/services/credits";
 import { createClient } from "@/lib/supabase";
 import { settingsService } from "@/lib/services/settings";
 import { loadRazorpay } from "@/lib/loadRazorpay";
 import ProfileSelectionModal from "@/components/ProfileSelectionModal";
 import ReactMarkdown from 'react-markdown';
-
-interface Message {
-    role: 'user' | 'ai';
-    content: string;
-    timestamp: number;
-    isHidden?: boolean;
-}
-
-interface ChatSession {
-    id: string;
-    title: string;
-    messages: Message[];
-    updatedAt: number;
-    primaryProfileId?: string;
-    secondaryProfileId?: string;
-}
+import { chatService, ChatSession, ChatMessage } from "@/lib/services/chat";
 
 function ChatContent() {
     const router = useRouter();
@@ -40,37 +25,20 @@ function ChatContent() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [chats, setChats] = useState<ChatSession[]>([]);
     const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState("");
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [isMobile, setIsMobile] = useState(false);
+    const [loadingMessages, setLoadingMessages] = useState(false);
 
     // User State
     const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
     const [packConfig, setPackConfig] = useState({ price: 49, credits: 10 });
     const [razorpayEnabled, setRazorpayEnabled] = useState(false);
 
-    // Auto-Start Check
-    useEffect(() => {
-        const isNewUser = searchParams.get('new') === 'true';
-        if (isNewUser) {
-            // Give a small delay for local storage to be ready or just proceed
-            setTimeout(async () => {
-                try {
-                    const saved = await horoscopeService.getSavedHoroscopes();
-                    if (saved.length > 0) {
-                        const latest = saved[0];
-                        // Automatically select this profile
-                        handleProfileSelect(latest);
-
-                        // Clean URL
-                        router.replace('/chat');
-                    }
-                } catch (e) {
-                    console.error("Auto-start error:", e);
-                }
-            }, 500);
-        }
-    }, [searchParams]);
+    // Profile Lookup Map (to resolve IDs to Objects/Names)
+    const [savedProfiles, setSavedProfiles] = useState<SavedHoroscope[]>([]);
 
     // Context State
     const [primaryProfile, setPrimaryProfile] = useState<SavedHoroscope | null>(null);
@@ -87,20 +55,44 @@ function ChatContent() {
     // Sync with hydration
     const [mounted, setMounted] = useState(false);
 
+    // 1. Initialize User & Settings & Profiles
     useEffect(() => {
         setMounted(true);
-        const stored = localStorage.getItem('horoscope_chats');
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            if (parsed.length > 0) {
-                setChats(parsed);
-                // Set to most recent or first
-                setCurrentChatId(parsed[0].id);
-            }
-        }
+        const init = async () => {
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
 
-        // Removed auto-creation of chat for empty state
-        // logic moved to explicit user action
+            if (user) {
+                setUserId(user.id);
+                setUserEmail(user.email || null);
+                loadChats(user.id);
+
+                // Load Profiles for Lookup
+                try {
+                    const profiles = await horoscopeService.getSavedHoroscopes();
+                    setSavedProfiles(profiles);
+                } catch (e) {
+                    console.error("Error loading profiles:", e);
+                }
+            } else {
+                // Not logged in -> Redirect to login?
+                // The middleware typically handles this, but explicit check implies we expect auth
+                // Actually, maybe we should redirect to home or login
+                // For now, let's assume they might be guest? But we need DB access.
+                // Redirect to login if not auth?
+                // window.location.href = '/?login=true';
+            }
+
+            // Settings
+            settingsService.getSettings().then(s => {
+                setPackConfig({ price: s.pack_price, credits: s.pack_credits });
+                setRazorpayEnabled(s.razorpay_enabled);
+            });
+
+            // Credits
+            const c = await creditService.getCredits();
+            setCredits(c);
+        };
 
         const checkMobile = () => {
             const mobile = window.innerWidth < 1024; // lg breakpoint
@@ -109,75 +101,129 @@ function ChatContent() {
             else setIsSidebarOpen(true);
         };
 
+        init();
         checkMobile();
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    useEffect(() => {
-        if (mounted && chats.length > 0) {
-            localStorage.setItem('horoscope_chats', JSON.stringify(chats));
-        }
-    }, [chats, mounted]);
+    const loadChats = async (uid: string) => {
+        try {
+            const sessions = await chatService.getSessions(uid);
+            setChats(sessions);
 
-    // Fetch Credits on Mount
-    useEffect(() => {
-        const fetchCredits = async () => {
-            const c = await creditService.getCredits();
-            setCredits(c);
-        };
-        fetchCredits();
-    }, []);
-
-    // Fetch User Email & Pack Config
-    useEffect(() => {
-        const fetchUser = async () => {
-            const supabase = createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user?.email) {
-                setUserEmail(user.email);
+            // Auto Select latest or first
+            if (sessions.length > 0 && !currentChatId) {
+                setCurrentChatId(sessions[0].id);
+            } else if (sessions.length === 0) {
+                // No chats? Wait for user action or create new?
+                // User expects to see "New Chat" button
             }
-        };
-        fetchUser();
-
-        // Load Settings from Server
-        settingsService.getSettings().then(s => {
-            setPackConfig({ price: s.pack_price, credits: s.pack_credits });
-            setRazorpayEnabled(s.razorpay_enabled);
-        });
-    }, []);
-
-    const getCurrentChat = () => chats.find(c => c.id === currentChatId);
-
-    const createNewChat = (initialMessage?: string) => {
-        const newId = Date.now().toString();
-        const newChat: ChatSession = {
-            id: newId,
-            title: "New Session",
-            messages: [{
-                role: 'ai',
-                content: "Hello! I am Parihaaram AI. I can analyze birth charts and compatibility.\n\nTo begin, please tell me **which profile** you would like to analyze today?",
-                timestamp: Date.now()
-            }],
-            updatedAt: Date.now()
-        };
-
-        // If initial message provided (from preset), add it immediately? 
-        // No, usually we want the AI greeting first.
-
-        setChats(prev => [newChat, ...prev]);
-        setCurrentChatId(newId);
-        setPrimaryProfile(null);
-        setSecondaryProfile(null);
-        if (isMobile) setIsSidebarOpen(false);
-        return newId;
+        } catch (e) {
+            console.error("Error loading chats:", e);
+        }
     };
 
-    const deleteChat = (e: React.MouseEvent, id: string) => {
+    // 2. Load Messages when Chat ID Changes
+    useEffect(() => {
+        if (!currentChatId || !userId) return;
+
+        const fetchSession = async () => {
+            setLoadingMessages(true);
+            try {
+                const session = await chatService.getSessionWithMessages(currentChatId);
+                setMessages(session.messages || []);
+
+                // Resolve Profiles
+                if (session.primary_profile_id && savedProfiles.length > 0) {
+                    const p1 = savedProfiles.find(p => p.id === session.primary_profile_id);
+                    setPrimaryProfile(p1 || null);
+                } else {
+                    setPrimaryProfile(null);
+                }
+
+                if (session.secondary_profile_id && savedProfiles.length > 0) {
+                    const p2 = savedProfiles.find(p => p.id === session.secondary_profile_id);
+                    setSecondaryProfile(p2 || null);
+                } else {
+                    setSecondaryProfile(null);
+                }
+
+            } catch (e) {
+                console.error("Error fetching messages:", e);
+            } finally {
+                setLoadingMessages(false);
+                scrollToBottom();
+            }
+        };
+
+        fetchSession();
+    }, [currentChatId, userId, savedProfiles]); // Re-run if profiles load late
+
+    // Auto-Start Check (New User from Landing)
+    useEffect(() => {
+        const isNewUser = searchParams.get('new') === 'true';
+        if (isNewUser && userId && savedProfiles.length > 0) {
+            // Find latest profile and start chat
+            // Avoid double creation
+            const hasRecentEmptyChat = chats.length > 0 && chats[0].title === "New Session" && (new Date().getTime() - new Date(chats[0].created_at).getTime() < 10000);
+            if (!hasRecentEmptyChat) {
+                const latest = savedProfiles[0];
+                // Create new chat with this profile
+                createNewChatWithProfile(latest);
+                router.replace('/chat');
+            }
+        }
+    }, [searchParams, userId, savedProfiles]);
+
+    const createNewChatWithProfile = async (profile: SavedHoroscope) => {
+        if (!userId) return;
+        try {
+            const newSession = await chatService.createSession(userId, "New Session", profile.id);
+            setChats(prev => [newSession, ...prev]);
+            setCurrentChatId(newSession.id);
+            // Add system/greeting message
+            await chatService.addMessage(newSession.id, 'ai', "Hello! I am Parihaaram AI. I see you've selected **" + profile.name + "**. How can I help you regarding this chart today?");
+            // Refresh logic handled by setCurrentChatId -> useEffect
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const createNewChat = async (initialMessage?: string) => {
+        if (!userId) return;
+        try {
+            const newSession = await chatService.createSession(userId, "New Session");
+            setChats(prev => [newSession, ...prev]);
+            setCurrentChatId(newSession.id);
+
+            // Add Greeting
+            await chatService.addMessage(newSession.id, 'ai', "Hello! I am Parihaaram AI. I can analyze birth charts and compatibility.\n\nTo begin, please tell me **which profile** you would like to analyze today?");
+
+            if (initialMessage) {
+                handleSend(initialMessage, false, undefined, newSession.id);
+            }
+
+            if (isMobile) setIsSidebarOpen(false);
+            return newSession.id;
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const deleteChat = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        setChats(prev => prev.filter(c => c.id !== id));
-        if (currentChatId === id) {
-            setCurrentChatId(null);
+        try {
+            await chatService.deleteSession(id);
+            setChats(prev => prev.filter(c => c.id !== id));
+            if (currentChatId === id) {
+                setCurrentChatId(null);
+                setMessages([]);
+                setPrimaryProfile(null);
+                setSecondaryProfile(null);
+            }
+        } catch (error) {
+            console.error("Failed to delete chat:", error);
         }
     };
 
@@ -189,33 +235,46 @@ function ChatContent() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [currentChatId, chats, isTyping]);
+    }, [messages, isTyping]);
 
-    const handleProfileSelect = (profile: SavedHoroscope) => {
-        if (modalMode === 'primary') {
-            setPrimaryProfile(profile);
 
-            // Add a system-like message to show selection
-            const selectionMsg: Message = {
+    const handleProfileSelect = async (profile: SavedHoroscope) => {
+        if (!currentChatId || !userId) return;
+
+        const isPrimary = modalMode === 'primary';
+
+        try {
+            // Update Session in DB
+            if (isPrimary) {
+                await chatService.updateSessionProfiles(currentChatId, profile.id, undefined);
+                setPrimaryProfile(profile);
+            } else {
+                await chatService.updateSessionProfiles(currentChatId, undefined, profile.id);
+                setSecondaryProfile(profile);
+            }
+
+            // User Message
+            const content = isPrimary
+                ? `I've selected **${profile.name}**'s profile.`
+                : `I've selected **${profile.name}** as the partner profile.`;
+
+            await chatService.addMessage(currentChatId, 'user', content);
+
+            // Refresh Messages (Optimistic update possible, but fetch is safer for consistent ID)
+            // Let's do optimistic for speed
+            const optimMsg: ChatMessage = {
+                id: Date.now().toString(),
                 role: 'user',
-                content: `I've selected **${profile.name}**'s profile.`,
-                timestamp: Date.now()
+                content,
+                created_at: new Date().toISOString(),
+                is_hidden: false
             };
+            setMessages(prev => [...prev, optimMsg]);
 
-            setChats(prev => prev.map(chat => {
-                if (chat.id === currentChatId) {
-                    return {
-                        ...chat,
-                        messages: [...chat.messages, selectionMsg],
-                        primaryProfileId: profile.id
-                    };
-                }
-                return chat;
-            }));
-
-            // Trigger AI acknowledgement/analysis
+            // Trigger AI
             setTimeout(() => {
-                handleSend(`Analyze ${profile.name}'s chart and provide a detailed 'Life Prediction' covering:
+                if (isPrimary) {
+                    handleSend(`Analyze ${profile.name}'s chart and provide a detailed 'Life Prediction' covering:
 1. Core Nature & Personality
 2. Current Emotional State
 3. Best Career Paths
@@ -223,30 +282,13 @@ function ChatContent() {
 5. Relationship with Parents
 
 At the end, please list 3 specific follow-up questions I can ask to elaborate on these topics.`, true, { p1: profile });
-            }, 500);
-
-        } else {
-            setSecondaryProfile(profile);
-            const selectionMsg: Message = {
-                role: 'user',
-                content: `I've selected **${profile.name}** as the partner profile.`,
-                timestamp: Date.now()
-            };
-
-            setChats(prev => prev.map(chat => {
-                if (chat.id === currentChatId) {
-                    return {
-                        ...chat,
-                        messages: [...chat.messages, selectionMsg],
-                        secondaryProfileId: profile.id
-                    };
+                } else {
+                    handleSend(`Compare ${primaryProfile?.name} and ${profile.name} for compatibility.`, true, { p1: primaryProfile || undefined, p2: profile });
                 }
-                return chat;
-            }));
-
-            setTimeout(() => {
-                handleSend(`Compare ${primaryProfile?.name} and ${profile.name} for compatibility.`, true, { p1: primaryProfile || undefined, p2: profile });
             }, 500);
+
+        } catch (e) {
+            console.error("Error selecting profile:", e);
         }
     };
 
@@ -255,7 +297,6 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
         setIsModalOpen(true);
     };
 
-    // Helper to check if message needs a button
     const shouldShowProfileButton = (content: string) => {
         const lower = content.toLowerCase();
         return lower.includes("which profile") || lower.includes("select a profile") || lower.includes("choose a profile") || lower.includes("select the partner");
@@ -266,145 +307,74 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
         return lower.includes("select the partner") || lower.includes("second profile") || lower.includes("partner's profile");
     };
 
-    const handleSend = async (text: string = input, hidden: boolean = false, overrideParams?: { p1?: SavedHoroscope, p2?: SavedHoroscope }) => {
-        if (!text.trim()) return;
+    const handleSend = async (text: string = input, hidden: boolean = false, overrideParams?: { p1?: SavedHoroscope, p2?: SavedHoroscope }, specificSessionId?: string) => {
+        if (!text.trim() && !hidden) return;
+        const targetChatId = specificSessionId || currentChatId;
 
-        let activeChatId = currentChatId;
-        let isNew = false;
-
-        // If no active chat, create one properly
-        if (!activeChatId) {
-            isNew = true;
-            activeChatId = Date.now().toString();
-            // We will add the chat to state WITH the user message in one go to avoid race conditions
-            // But we also need the initial AI greeting
+        if (!targetChatId) {
+            return createNewChat(text);
         }
 
-        const timestamp = Date.now();
-        const userMsg: Message = { role: 'user', content: text, timestamp, isHidden: hidden };
-
-        // Determine effective profiles
-        const effectivePrimary = overrideParams?.p1 || primaryProfile;
-        const effectiveSecondary = overrideParams?.p2 || secondaryProfile;
-
-        if (isNew) {
-            const newChat: ChatSession = {
-                id: activeChatId!,
-                title: (!hidden) ? text.slice(0, 30) + (text.length > 30 ? '...' : '') : "New Session",
-                messages: [
-                    {
-                        role: 'ai',
-                        content: "Hello! I am Parihaaram AI. I can analyze birth charts and compatibility.\n\nTo begin, please tell me **which profile** you would like to analyze today?",
-                        timestamp: Date.now() - 100 // Slightly before
-                    },
-                    userMsg
-                ],
-                updatedAt: timestamp,
-                primaryProfileId: effectivePrimary?.id,
-                secondaryProfileId: effectiveSecondary?.id
-            };
-            setChats(prev => [newChat, ...prev]);
-            setCurrentChatId(activeChatId);
-            if (isMobile) setIsSidebarOpen(false);
-        } else {
-            setChats(prev => prev.map(chat => {
-                if (chat.id === activeChatId) {
-                    const updatedMessages = [...chat.messages, userMsg];
-                    // Update title ONLY if visible message and first one (technically 2nd if AI greeted)
-                    // But if AI greeted, length is 1.
-                    const title = (chat.messages.length <= 1 && !hidden) ? text.slice(0, 30) + (text.length > 30 ? '...' : '') : chat.title;
-                    return {
-                        ...chat,
-                        messages: updatedMessages,
-                        title,
-                        updatedAt: timestamp,
-                        primaryProfileId: effectivePrimary?.id,
-                        secondaryProfileId: effectiveSecondary?.id
-                    };
-                }
-                return chat;
-            }));
-        }
+        // Optimistic User Msg
+        const tempId = Date.now().toString();
+        const userMsg: ChatMessage = {
+            id: tempId,
+            role: 'user',
+            content: text,
+            created_at: new Date().toISOString(),
+            is_hidden: hidden
+        };
 
         if (!hidden) setInput("");
+        setMessages(prev => [...prev, userMsg]);
         setIsTyping(true);
 
         try {
-            // Get current history for this chat
-            // If new, history is just the greeting + user msg we just added
-            // But state might not match yet. So allow constructing history manually
-            let currentHistory: Message[] = [];
-            if (isNew) {
-                currentHistory = [
-                    {
-                        role: 'ai',
-                        content: "Hello! I am Parihaaram AI. I can analyze birth charts and compatibility.\n\nTo begin, please tell me **which profile** you would like to analyze today?",
-                        timestamp: Date.now() - 100
-                    },
-                    userMsg
-                ];
-            } else {
-                currentHistory = chats.find(c => c.id === activeChatId)?.messages || [];
-                // existing logic might read stale 'chats' from closure scope?
-                // 'chats' is in dependency array? handleSend isn't wrapped in useCallback directly here but defined in component.
-                // It reads current 'chats'.
-                // If we didn't use functional update above, it's fine.
-                // But we used setChats(prev => ...). 'chats' var in this scope is OLD.
-                // So we should append userMsg to 'chats.find(...)' manually for the API call.
-                if (currentHistory.length > 0) {
-                    currentHistory = [...currentHistory, userMsg];
-                }
-            }
+            // Save User Message
+            await chatService.addMessage(targetChatId, 'user', text, hidden);
 
+            // Prepare AI Context
+            const effectivePrimary = overrideParams?.p1 || primaryProfile;
+            const effectiveSecondary = overrideParams?.p2 || secondaryProfile;
+
+            // Generate AI Response
             const response = await aiService.generateResponse(text, {
                 primaryProfile: effectivePrimary || undefined,
                 secondaryProfile: effectiveSecondary || undefined
-            }, currentHistory);
+            }, messages.filter(m => m.role !== 'system')); // Pass users/ai history only
 
-            const aiMsg: Message = {
-                role: 'ai',
-                content: response.reply,
-                timestamp: Date.now()
-            };
+            // Save AI Message
+            const aiMsg = await chatService.addMessage(targetChatId, 'ai', response.reply);
 
-            // Update Credits if provided
+            // Update State
+            setMessages(prev => prev.map(m => m.id === tempId ? { ...userMsg, id: 'saved-' + tempId } : m).concat(aiMsg));
+
+            // Update Title if needed (First visible message)
+            const visibleMsgs = messages.filter(m => !m.is_hidden);
+            if (visibleMsgs.length <= 1 && !hidden) {
+                const newTitle = text.slice(0, 30) + (text.length > 30 ? '...' : '');
+                await chatService.updateSessionTitle(targetChatId, newTitle);
+                // Update sidebar list
+                setChats(prev => prev.map(c => c.id === targetChatId ? { ...c, title: newTitle } : c));
+            }
+
             if (response.remainingCredits !== undefined) {
                 setCredits(response.remainingCredits);
             }
 
-            setChats(prev => prev.map(chat => {
-                if (chat.id === activeChatId) {
-                    return { ...chat, messages: [...chat.messages, aiMsg] };
-                }
-                return chat;
-            }));
         } catch (error: any) {
             console.error(error);
             if (error.message === "OUT_OF_CREDITS") {
                 setShowPayModal(true);
-                // Also add an AI system message saying "Out of credits"
-                const systemMsg: Message = {
-                    role: 'ai',
-                    content: "You have run out of messages. Please recharge to continue.",
-                    timestamp: Date.now()
-                };
-                setChats(prev => prev.map(chat => {
-                    if (chat.id === activeChatId) {
-                        return { ...chat, messages: [...chat.messages, systemMsg] };
-                    }
-                    return chat;
-                }));
+                const sysMsg = await chatService.addMessage(targetChatId, 'ai', "You have run out of messages. Please recharge to continue.", false);
+                setMessages(prev => [...prev, sysMsg]);
             }
         } finally {
             setIsTyping(false);
         }
     };
 
-
-    const currentMessages = getCurrentChat()?.messages || [];
-
-    // Filter out hidden messages for display
-    const visibleMessages = currentMessages.filter(m => !m.isHidden);
+    const visibleMessages = messages.filter(m => !m.is_hidden);
 
     const presets = [
         { icon: <Briefcase className="w-4 h-4" />, label: "Start Business", query: "Is this a good time to start a business based on my Dasha?" },
@@ -434,7 +404,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                 title={modalMode === 'primary' ? "Select Main Profile" : "Select Partner Profile"}
             />
 
-            {/* Pay Modal Mock */}
+            {/* Pay Modal */}
             {showPayModal && (
                 <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
                     <motion.div
@@ -490,22 +460,6 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                             if (success) {
                                                 setCredits(prev => (prev || 0) + packConfig.credits);
                                                 setPaymentSuccess(true);
-
-                                                // If we were effectively out of credits (blocked), clean up the error message
-                                                if ((credits ?? 0) <= 0) {
-                                                    setChats(prev => prev.map(chat => {
-                                                        if (chat.id === currentChatId) {
-                                                            const lastMsg = chat.messages[chat.messages.length - 1];
-                                                            if (lastMsg.role === 'ai' && lastMsg.content.includes("run out of messages")) {
-                                                                return {
-                                                                    ...chat,
-                                                                    messages: chat.messages.slice(0, -1)
-                                                                };
-                                                            }
-                                                        }
-                                                        return chat;
-                                                    }));
-                                                }
                                             } else {
                                                 alert("Recharge failed. Please try again.");
                                             }
@@ -539,7 +493,6 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                             description: `${packConfig.credits} Credit Pack`,
                                             order_id: orderData.id,
                                             handler: async function (response: any) {
-                                                // Verify Payment
                                                 const verifyRes = await fetch('/api/verify-payment', {
                                                     method: 'POST',
                                                     body: JSON.stringify({
@@ -548,27 +501,12 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                                         razorpaySignature: response.razorpay_signature,
                                                     }),
                                                 });
-                                                const verifyData = await verifyRes.json();
 
                                                 if (verifyRes.ok) {
-                                                    // Payment Verified, Add Credits
                                                     const success = await creditService.topUpCredits(packConfig.credits);
                                                     if (success) {
                                                         setCredits(prev => (prev || 0) + packConfig.credits);
                                                         setPaymentSuccess(true);
-
-                                                        // Clean up error message
-                                                        if ((credits ?? 0) <= 0) {
-                                                            setChats(prev => prev.map(chat => {
-                                                                if (chat.id === currentChatId) {
-                                                                    const lastMsg = chat.messages[chat.messages.length - 1];
-                                                                    if (lastMsg.role === 'ai' && lastMsg.content.includes("run out of messages")) {
-                                                                        return { ...chat, messages: chat.messages.slice(0, -1) };
-                                                                    }
-                                                                }
-                                                                return chat;
-                                                            }));
-                                                        }
                                                     } else {
                                                         alert("Payment verified but credit update failed. Contact support.");
                                                     }
@@ -676,7 +614,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                         {chat.title}
                                     </p>
                                     <p className="text-[10px] text-slate-400 truncate">
-                                        {new Date(chat.updatedAt).toLocaleDateString()}
+                                        {new Date(chat.updated_at).toLocaleDateString()}
                                     </p>
                                 </div>
                                 <button
@@ -693,7 +631,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                 {/* Main Chat Area */}
                 <div className="flex-1 flex flex-col relative bg-white w-full h-full">
 
-                    {/* Header with Context */}
+                    {/* Header */}
                     <header className="flex flex-col border-b border-slate-50 z-10 shrink-0 bg-white">
                         <div className="px-4 py-3 md:px-6 md:py-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -711,7 +649,6 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                 </div>
                             </div>
 
-                            {/* Credits & End Chat Actions */}
                             <div className="flex items-center gap-2 sm:gap-3">
                                 <button
                                     onClick={() => setShowPayModal(true)}
@@ -734,7 +671,6 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                         <div className="px-4 md:px-6 pb-3 pt-0 flex overflow-x-auto gap-2 items-center flex-nowrap scrollbar-hide">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2 shrink-0 hidden xs:block">Context:</span>
 
-                            {/* Primary Profile */}
                             <button
                                 onClick={() => openProfileSelector('primary')}
                                 className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${primaryProfile ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-600'}`}
@@ -743,7 +679,6 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                 {primaryProfile ? primaryProfile.name : "Select Profile"}
                             </button>
 
-                            {/* Secondary Profile (Only if primary selected) */}
                             {primaryProfile && (
                                 <>
                                     <span className="text-slate-300 text-[10px] shrink-0">&</span>
@@ -760,21 +695,25 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                         </div>
                     </header>
 
-                    {/* Messages */}
-                    {/* Messages Area - Secure Rendering */}
+                    {/* Messages Area */}
                     <div className={`flex-1 px-4 sm:px-8 py-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-100 relative ${credits !== null && credits <= 0 ? 'overflow-hidden' : 'overflow-y-auto'}`}>
 
-                        {/* LOADING STATE */}
-                        {credits === null && (
+                        {/* LOADING STATE - INITIAL */}
+                        {(credits === null) && (
                             <div className="h-full flex items-center justify-center">
                                 <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                             </div>
                         )}
 
-                        {/* BLOCKED/NO CREDITS STATE - Securely Hidden Data */}
+                        {loadingMessages && (
+                            <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10 backdrop-blur-sm">
+                                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                            </div>
+                        )}
+
+                        {/* BLOCKED/NO CREDITS STATE */}
                         {credits !== null && credits <= 0 && (
                             <>
-                                {/* Fake Blurred Content (Security: Real data not rendered) */}
                                 <div className="blur-md select-none pointer-events-none opacity-40 space-y-8" aria-hidden="true">
                                     {[1, 2, 3, 4].map((i) => (
                                         <div key={i} className={`flex gap-4 max-w-2xl ${i % 2 === 0 ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}>
@@ -784,7 +723,6 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                     ))}
                                 </div>
 
-                                {/* Persistent Overlay */}
                                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center">
                                     <motion.div
                                         initial={{ opacity: 0, scale: 0.95 }}
@@ -809,7 +747,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                             </>
                         )}
 
-                        {/* ACTIVE STATE - Real Data */}
+                        {/* ACTIVE STATE */}
                         {credits !== null && credits > 0 && (
                             <>
                                 {visibleMessages.length === 0 ? (
@@ -844,7 +782,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                         <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            key={i}
+                                            key={msg.id || i}
                                             className={`flex gap-3 sm:gap-4 max-w-[90%] sm:max-w-2xl ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
                                         >
                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 ${msg.role === 'ai' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-600'}`}>

@@ -94,12 +94,14 @@ export default function AuthModal({ isOpen, onClose, customTitle, customDescript
                                         <span>Continue with Google</span>
                                     </button>
 
-                                    <button
-                                        onClick={() => setShowEmailLogin(true)}
-                                        className="w-full text-center text-[10px] text-slate-400 hover:text-indigo-600 font-bold uppercase tracking-widest transition-colors py-2"
-                                    >
-                                        Test Login (Email)
-                                    </button>
+                                    {typeof window !== 'undefined' && window.location.hostname === 'localhost' && (
+                                        <button
+                                            onClick={() => setShowEmailLogin(true)}
+                                            className="w-full text-center text-[10px] text-slate-400 hover:text-indigo-600 font-bold uppercase tracking-widest transition-colors py-2"
+                                        >
+                                            Test Login (Email)
+                                        </button>
+                                    )}
                                 </>
                             ) : (
                                 <form

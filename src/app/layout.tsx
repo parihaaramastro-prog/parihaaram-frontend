@@ -10,6 +10,11 @@ export const metadata: Metadata = {
     title: "Pariharam — High-Precision Predictive Astrology",
     description: "Advanced astronomical computing and analytical predictive insights powered by proprietary algorithms.",
     keywords: ["Pariharam", "Precision Astrology", "Vedic Computing", "Predictive Analytics"],
+    icons: {
+        icon: '/parihaaram-logo.png',
+        shortcut: '/parihaaram-logo.png',
+        apple: '/parihaaram-logo.png',
+    }
 };
 
 export const viewport: Viewport = {
