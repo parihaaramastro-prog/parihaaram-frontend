@@ -12,13 +12,7 @@ interface UserProfileDropdownProps {
 }
 
 export default function UserProfileDropdown({ user }: UserProfileDropdownProps) {
-    // Debug Log
-    useEffect(() => {
-        if (user) {
-            console.log("UserProfileDropdown User Data:", user);
-            console.log("User Metadata:", user.user_metadata);
-        }
-    }, [user]);
+
 
     const [isOpen, setIsOpen] = useState(false);
     const [credits, setCredits] = useState<number | null>(null);
