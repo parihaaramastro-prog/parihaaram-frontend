@@ -49,15 +49,15 @@ export default function AuthModal({ isOpen, onClose, customTitle, customDescript
 
                         <div className="text-center space-y-4 mb-8">
                             <div className="flex justify-center mb-6">
-                                <Image
-                                    src="/parihaaram-logo.png"
-                                    alt="Parihaaram Logo"
-                                    width={0}
-                                    height={0}
-                                    sizes="100vw"
-                                    className="h-12 w-auto object-contain"
-                                    style={{ width: 'auto', height: '100%' }}
-                                />
+                                <div className="relative w-20 h-20">
+                                    <Image
+                                        src="/parihaaram-logo.png"
+                                        alt="Parihaaram Logo"
+                                        fill
+                                        className="object-contain"
+                                        sizes="(max-width: 768px) 100vw, 80px"
+                                    />
+                                </div>
                             </div>
 
                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-widest shadow-sm">
