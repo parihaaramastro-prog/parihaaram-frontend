@@ -9,16 +9,7 @@ interface DivineDatePickerProps {
     className?: string;
 }
 
-const MONTHS = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-];
-
-// Full names for accessibility or mapping if needed, but 3 cols on mobile might be tight for full names
-const FULL_MONTHS = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-];
+// ... imports ...
 
 export default function DivineDatePicker({ value, onChange, className = "" }: DivineDatePickerProps) {
     const [day, setDay] = useState("");
@@ -44,14 +35,9 @@ export default function DivineDatePicker({ value, onChange, className = "" }: Di
     };
 
     const days = Array.from({ length: 31 }, (_, i) => (i + 1).toString().padStart(2, "0"));
+    const months = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"));
     const currentYear = new Date().getFullYear();
     const years = Array.from({ length: 120 }, (_, i) => (currentYear - i).toString());
-
-    const getMonthDisplay = (m: string) => {
-        if (!m) return "Month";
-        const idx = parseInt(m) - 1;
-        return FULL_MONTHS[idx] || m;
-    };
 
     return (
         <div className={`grid grid-cols-3 gap-3 ${className}`}>
@@ -76,7 +62,7 @@ export default function DivineDatePicker({ value, onChange, className = "" }: Di
             {/* Month Select */}
             <div className="relative group">
                 <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm font-bold text-slate-900 group-hover:bg-white transition-all flex items-center justify-between">
-                    <span className="truncate">{getMonthDisplay(month)}</span>
+                    <span className="truncate">{month || "Month"}</span>
                     <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors flex-shrink-0" />
                 </div>
                 <select
@@ -85,8 +71,8 @@ export default function DivineDatePicker({ value, onChange, className = "" }: Di
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-[16px] z-10"
                 >
                     <option value="" disabled>Month</option>
-                    {FULL_MONTHS.map((m, i) => (
-                        <option key={m} value={(i + 1).toString().padStart(2, "0")}>{m}</option>
+                    {months.map((m) => (
+                        <option key={m} value={m}>{m}</option>
                     ))}
                 </select>
             </div>

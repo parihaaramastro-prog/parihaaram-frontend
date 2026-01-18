@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
             .select('*')
             .single();
 
-        const selectedModel = settings?.ai_model || 'gpt-4o'; // Default to GPT-4o
+        const selectedModel = settings?.ai_model || 'gemini-2.0-flash'; // Default to Gemini 2.0 Flash
 
         const body = await req.json();
         const { messages, context } = body;
@@ -218,6 +218,34 @@ Otherwise, answer the user's question directly based on the provided context.`;
                 const dasha = c.mahadashas?.find((m: any) => m.is_current);
                 const bhukti = dasha?.bhuktis?.find((b: any) => b.is_current);
 
+                // --- NEW: Age & Life Stage Calculation ---
+                const birthDate = new Date(primaryProfile.dob);
+                const today = new Date();
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+
+                let lifeStage = "Unknown";
+                if (age < 18) {
+                    lifeStage = "Schooling Period (Foundational Learning & Childhood)";
+                } else if (age >= 18 && age < 23) {
+                    lifeStage = "College / Higher Education (UG/PG) Phase";
+                } else if (age >= 23 && age < 26) {
+                    lifeStage = "Early Career / Entry Level / Struggle & Exploration Phase";
+                } else {
+                    lifeStage = "Career Growth / Family / Settling Down / Stability Phase";
+                }
+
+                // --- NEW: Birth Dasha (First in sequence) ---
+                const birthDashaObj = c.mahadashas && c.mahadashas.length > 0 ? c.mahadashas[0] : null;
+                const birthBhuktiObj = birthDashaObj?.bhuktis && birthDashaObj.bhuktis.length > 0 ? birthDashaObj.bhuktis[0] : null;
+
+                const birthDashaStr = birthDashaObj ? `${birthDashaObj.planet} Dasha (Ended: ${birthDashaObj.end_date})` : "Unknown";
+                const birthBhuktiStr = birthBhuktiObj ? `${birthBhuktiObj.planet} Bhukti (Ended: ${birthBhuktiObj.end_date})` : "Unknown";
+                // ----------------------------------------
+
                 // Helper to get Sign Index from Name (0=Aries, 11=Pisces)
                 const getSignIndex = (name: string | undefined | null): number => {
                     if (!name) return -1;
@@ -258,14 +286,22 @@ Otherwise, answer the user's question directly based on the provided context.`;
                 systemPrompt += `\n\nActive Profile Context:
 Name: ${primaryProfile.name}
 Birth Details: ${primaryProfile.dob} at ${primaryProfile.tob} in ${primaryProfile.pob}
+Age: ${age} years
+Life Stage: ${lifeStage}
+
 Coordinates: ${primaryProfile.lat}, ${primaryProfile.lon}
 Lagna (Ascendant): ${c.lagna?.name} (Sign Index: ${lagnaIdx}) at ${lagnaDegree}°
 IMPORTANT REFERENCE: In this chart, ${c.lagna?.name} is the 1st House. Calculation starts from ${c.lagna?.name}.
 
 Rasi (Moon Sign): ${c.moon_sign?.name}
 Nakshatra: ${c.nakshatra?.name}
+
+--- TIMING & DASA ---
+Birth Dasha: ${birthDashaStr}
+Birth Bhukti: ${birthBhuktiStr}
 Current Dasha: ${dasha?.planet || 'Unk'} (Ends: ${dasha?.end_date})
 Current Bhukti: ${bhukti?.planet || 'Unk'} (Ends: ${bhukti?.end_date})
+---------------------
 
 Planetary Positions (Calculated Whole Sign Houses relative to ${c.lagna?.name}):
 ${planetsContext}
@@ -305,7 +341,7 @@ Nakshatra: ${c2.nakshatra?.name}
         console.log(`--- Using Model: ${selectedModel.toUpperCase()} ---`);
 
         if (selectedModel.startsWith('gemini')) {
-            console.log(`--- Using Model: GEMINI-2.5-FLASH ---`);
+            console.log(`--- Using Model: GEMINI-2.0-FLASH ---`);
             // --- GEMINI HANDLER ---
 
             // Map messages to Gemini Content format
@@ -318,7 +354,7 @@ Nakshatra: ${c2.nakshatra?.name}
 
             try {
                 const response = await genAI.models.generateContent({
-                    model: "gemini-2.5-flash",
+                    model: "gemini-2.0-flash",
                     contents: contents,
                     config: {
                         systemInstruction: systemPrompt,

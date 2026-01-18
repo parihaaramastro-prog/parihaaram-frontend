@@ -216,9 +216,14 @@ export default function AIAstrologerLanding() {
                             <div className="flex flex-col gap-4">
                                 <div className="flex items-center gap-2">
                                     <div className="flex -space-x-3">
-                                        {['Priya', 'Raj', 'Amit', 'Sneha'].map((seed, i) => (
+                                        {[
+                                            "https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=150&q=80",
+                                            "https://images.unsplash.com/photo-1566492031773-4f4e44671857?auto=format&fit=crop&w=150&q=80",
+                                            "https://images.unsplash.com/photo-1589156191108-c762ff0b9655?auto=format&fit=crop&w=150&q=80",
+                                            "https://images.unsplash.com/photo-1556157382-97eda2d62296?auto=format&fit=crop&w=150&q=80"
+                                        ].map((src, i) => (
                                             <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center overflow-hidden">
-                                                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`} alt="User" />
+                                                <img src={src} alt="User" className="w-full h-full object-cover" />
                                             </div>
                                         ))}
                                     </div>
@@ -242,7 +247,7 @@ export default function AIAstrologerLanding() {
                             </div>
 
                             <div className="relative z-10 space-y-8">
-                                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Unlock Your Reading</h3>
+                                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Reveal Your Deepest Desires & Hidden Destiny</h3>
 
                                 <div className="space-y-5">
                                     <div className="space-y-1.5">
@@ -256,8 +261,8 @@ export default function AIAstrologerLanding() {
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="md:col-span-2">
+                                    <div className="space-y-4">
+                                        <div>
                                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-1.5 block">Birth Date</label>
                                             <DivineDatePicker
                                                 value={formData.dob}
@@ -265,7 +270,7 @@ export default function AIAstrologerLanding() {
                                             />
                                         </div>
 
-                                        <div className="md:col-span-2">
+                                        <div>
                                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1 mb-1.5 block">Birth Time</label>
                                             <DivineTimePicker
                                                 value={formData.tob}
@@ -373,16 +378,19 @@ export default function AIAstrologerLanding() {
                         <TestimonialCard
                             name="Priya Menon"
                             place="Kochi"
+                            image="https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=150&q=80"
                             text="I was consulting astrologers for years about my marriage delay. The AI pointed out a specific Dosha that others missed and suggested a simple remedy. I got engaged 3 months later!"
                         />
                         <TestimonialCard
                             name="Rajesh Kumar"
                             place="Delhi"
+                            image="https://images.unsplash.com/photo-1566492031773-4f4e44671857?auto=format&fit=crop&w=150&q=80"
                             text="I asked 'When will I get a promotion?' and it gave me a date range. It happened exactly in that week. The precision is actually scary."
                         />
                         <TestimonialCard
                             name="Amit Patel"
                             place="Ahmedabad"
+                            image="https://images.unsplash.com/photo-1556157382-97eda2d62296?auto=format&fit=crop&w=150&q=80"
                             text="Much better than generic horoscopes. It explains WHY things are happening based on my chart. Helped me navigate a very tough business loss."
                         />
                     </div>
@@ -413,7 +421,7 @@ function SampleCard({ icon, question, desc }: any) {
     )
 }
 
-function TestimonialCard({ name, place, text }: any) {
+function TestimonialCard({ name, place, text, image }: any) {
     return (
         <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all relative">
             <Quote className="w-8 h-8 text-indigo-100 absolute top-6 right-6 fill-indigo-50" />
@@ -421,9 +429,12 @@ function TestimonialCard({ name, place, text }: any) {
                 {[1, 2, 3, 4, 5].map(i => <Star key={i} className="w-3.5 h-3.5 fill-current" />)}
             </div>
             <p className="text-slate-600 font-medium leading-relaxed mb-6">"{text}"</p>
-            <div>
-                <p className="text-sm font-bold text-slate-900">{name}</p>
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{place}</p>
+            <div className="flex items-center gap-4">
+                <img src={image} alt={name} className="w-12 h-12 rounded-full object-cover border-2 border-slate-100" />
+                <div>
+                    <p className="text-sm font-bold text-slate-900">{name}</p>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{place}</p>
+                </div>
             </div>
         </div>
     )

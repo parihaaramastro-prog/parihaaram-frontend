@@ -6,22 +6,18 @@ import {
     Compass, Sparkles, History, User, Bot,
     Briefcase, ShieldCheck, Users, LogOut, Menu, X
 } from "lucide-react";
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { createClient } from "@/lib/supabase";
 import UserProfileDropdown from "./UserProfileDropdown";
 import AuthModal from "./AuthModal";
+import { horoscopeService } from "@/lib/services/horoscope";
 
 export default function Navbar() {
     const pathname = usePathname();
+    const router = useRouter();
     const [isScrolled, setIsScrolled] = useState(false);
-
-    // Hide navbar on astrologer and admin pages
-    if (pathname?.startsWith('/astrologer') || pathname?.startsWith('/admin')) {
-        return null;
-    }
-
     const [isAuthOpen, setIsAuthOpen] = useState(false);
     const [user, setUser] = useState<any>(null);
     const [role, setRole] = useState<string | null>(null);
@@ -32,23 +28,36 @@ export default function Navbar() {
         window.addEventListener("scroll", handleScroll);
 
         const supabase = createClient();
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(({ data: { session }, error }) => {
+            if (error) {
+                console.warn("Auth session error:", error.message);
+                return;
+            }
             setUser(session?.user ?? null);
             if (session?.user) {
+                // Pre-fetch profiles into cache
+                horoscopeService.getSavedHoroscopes().catch(() => { });
+
                 import("@/lib/services/profile").then(({ profileService }) => {
-                    profileService.getProfile().then(p => setRole(p?.role || 'customer'));
+                    profileService.getProfile().then(p => setRole(p?.role || 'customer')).catch(() => { });
                 });
             }
+        }).catch(err => {
+            console.warn("Failed to check initial session (network or config issue):", err);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setUser(session?.user ?? null);
             if (session?.user) {
+                // Pre-fetch profiles into cache
+                horoscopeService.getSavedHoroscopes().catch(console.error);
+
                 import("@/lib/services/profile").then(({ profileService }) => {
                     profileService.getProfile().then(p => setRole(p?.role || 'customer'));
                 });
             } else {
                 setRole(null);
+                horoscopeService.clearCache();
             }
         });
 
@@ -59,9 +68,20 @@ export default function Navbar() {
     }, []);
 
     const handleLogout = async () => {
-        const supabase = createClient();
-        await supabase.auth.signOut();
-        window.location.href = "/";
+        // Instant UI feedback
+        setUser(null);
+        setRole(null);
+        horoscopeService.clearCache();
+
+        try {
+            const supabase = createClient();
+            await supabase.auth.signOut();
+        } catch (e) {
+            console.warn("Logout error:", e);
+        } finally {
+            router.push("/");
+            router.refresh(); // Ensure middleware re-checks for next navigation
+        }
     };
 
     const navLinks = {
@@ -85,6 +105,11 @@ export default function Navbar() {
     };
 
     const currentLinks = !user ? navLinks.guest : role === 'admin' ? navLinks.admin : role === 'astrologer' ? navLinks.astrologer : navLinks.customer;
+
+    // Hide navbar on astrologer and admin pages
+    if (pathname?.startsWith('/astrologer') || pathname?.startsWith('/admin')) {
+        return null;
+    }
 
     return (
         <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isScrolled ? 'py-4' : 'py-8'}`}>

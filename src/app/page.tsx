@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import HoroscopeForm from "@/components/HoroscopeForm";
 import HoroscopeResult from "@/components/HoroscopeResult";
 import Testimonials from "@/components/Testimonials";
-import { AstrologyResults } from "@/lib/astrology";
+import { RASHI_PREDICTIONS } from "@/lib/predictions-2026";
 import Link from "next/link";
 import {
-    Shield, Briefcase, Lock, Clock, Compass, Sparkles
+    Shield, Briefcase, Lock, Clock, Compass, Sparkles, ArrowRight
 } from "lucide-react";
 import AuthModal from "@/components/AuthModal";
 import { createClient } from "@/lib/supabase";
@@ -108,6 +108,17 @@ function HomeContent() {
 
     return (
         <>
+            {/* Announcement Bar */}
+            <Link href="/predictions">
+                <div className="bg-indigo-600 text-white py-2 px-4 text-center cursor-pointer hover:bg-indigo-700 transition-colors relative z-50">
+                    <p className="text-xs md:text-sm font-medium flex items-center justify-center gap-2">
+                        <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">New</span>
+                        <span>Check out your 2026 Horoscope Predictions (English & Tamil)</span>
+                        <ArrowRight className="w-4 h-4" />
+                    </p>
+                </div>
+            </Link>
+
             {/* Fixed Top Header - Show when user is logged in */}
 
 
@@ -217,6 +228,85 @@ function HomeContent() {
                                             <p className="text-sm font-medium text-slate-500 leading-relaxed">{feature.desc}</p>
                                         </div>
                                     ))}
+                                </div>
+                            </section>
+
+                            {/* New: AI Spotlight Section */}
+                            <section className="max-w-[1400px] mx-auto px-6">
+                                <div className="relative rounded-[3rem] overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl shadow-indigo-500/20">
+                                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-20 mix-blend-overlay" />
+                                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-900/50" />
+
+                                    <div className="relative z-10 grid md:grid-cols-2 gap-12 p-12 md:p-24 items-center">
+                                        <div className="space-y-8">
+                                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-widest">
+                                                <Sparkles className="w-4 h-4" />
+                                                New Intelligence
+                                            </div>
+                                            <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter leading-[1.1]">
+                                                Decode Your Destiny with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">AI Precision</span>
+                                            </h2>
+                                            <p className="text-lg text-slate-400 leading-relaxed max-w-lg">
+                                                Our advanced AI Astrologer analyzes planetary transits, dashas, and nakshatra padams to provide hyper-personalized insights instantly.
+                                            </p>
+                                            <div className="flex flex-wrap gap-4">
+                                                <Link href="/ai" className="px-8 py-4 bg-white text-slate-900 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-indigo-50 transition-colors flex items-center gap-2">
+                                                    Try AI Chat <ArrowRight className="w-4 h-4" />
+                                                </Link>
+                                                <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="px-8 py-4 bg-transparent border border-slate-700 text-white rounded-xl font-bold text-sm uppercase tracking-widest hover:border-slate-500 transition-colors">
+                                                    Get Birth Chart
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="hidden md:block relative">
+                                            {/* Abstract UI Mockup */}
+                                            <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 shadow-2xl transform rotate-3 hover:rotate-0 transition-transform duration-500">
+                                                <div className="flex items-center gap-4 mb-6 border-b border-slate-700/50 pb-4">
+                                                    <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
+                                                        <Sparkles className="w-5 h-5 text-indigo-400" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="h-2 w-24 bg-slate-600 rounded mb-1.5" />
+                                                        <div className="h-1.5 w-16 bg-slate-700 rounded" />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <div className="h-2 w-full bg-slate-700/50 rounded" />
+                                                    <div className="h-2 w-5/6 bg-slate-700/50 rounded" />
+                                                    <div className="h-2 w-4/6 bg-slate-700/50 rounded" />
+                                                </div>
+                                                <div className="mt-6 p-4 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+                                                    <div className="flex gap-2">
+                                                        <div className="h-2 w-2 bg-indigo-400 rounded-full animate-bounce" />
+                                                        <div className="h-2 w-2 bg-indigo-400 rounded-full animate-bounce delay-75" />
+                                                        <div className="h-2 w-2 bg-indigo-400 rounded-full animate-bounce delay-150" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* New: 2026 Predictions Preview */}
+                            <section className="max-w-[1400px] mx-auto px-6 py-12">
+                                <div className="text-center space-y-4 mb-12">
+                                    <span className="text-[10px] font-bold text-amber-600 uppercase tracking-[0.2em] bg-amber-50 px-3 py-1 rounded-full">Annual Forecast</span>
+                                    <h2 className="text-4xl font-black text-slate-900 tracking-tight">2026 Horoscope Predictions</h2>
+                                    <p className="text-slate-500 max-w-2xl mx-auto">General guidance based on your Moon Sign (Rashi).</p>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    {Object.entries(RASHI_PREDICTIONS).slice(0, 4).map(([sign, data]) => (
+                                        <Link key={sign} href="/predictions" className="group p-6 bg-white border border-slate-200 rounded-2xl hover:border-indigo-500 transition-all hover:shadow-lg">
+                                            <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">{sign}</h3>
+                                            <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed">{data.overview}</p>
+                                        </Link>
+                                    ))}
+                                </div>
+                                <div className="mt-12 text-center">
+                                    <Link href="/predictions" className="inline-flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-widest transition-colors">
+                                        View All Signs <ArrowRight className="w-4 h-4" />
+                                    </Link>
                                 </div>
                             </section>
 

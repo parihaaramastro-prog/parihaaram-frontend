@@ -79,13 +79,12 @@ export default function AdminDashboard() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [conData, astroData, creditsData] = await Promise.all([
+            const [conData, astroData] = await Promise.all([
                 consultationService.getAllConsultations(),
-                profileService.getAstrologers(),
-                creditService.getAllUserCredits()
+                profileService.getAstrologers()
             ]);
 
-            // Fetch Users from Admin API (includes Google OAuth users)
+            // Fetch Users from Admin API (includes Google OAuth users & Credits)
             const userRes = await fetch('/api/admin/users');
             const userData = await userRes.json();
 
@@ -93,13 +92,14 @@ export default function AdminDashboard() {
             setAstrologers(astroData);
             setAllUsers(userData.users || []);
 
+            // Populate credits from user data directly
             const creditMap: Record<string, number> = {};
-            creditsData.forEach((c: any) => { creditMap[c.user_id] = c.credits; });
+            if (userData.users) {
+                userData.users.forEach((u: any) => { creditMap[u.id] = u.credits || 0; });
+            }
             setUserCredits(creditMap);
 
             const supabase = createClient();
-            // Join with auth.users to get emails if possible, but RLS might block foreign table join if not careful.
-            // Simpler: Fetch logs, and we map User IDs to Emails from 'allUsers' state on the client side.
             const { data: logs } = await supabase.from('chat_logs').select('*').order('created_at', { ascending: false }).limit(100);
             setChatLogs(logs || []);
 
@@ -108,7 +108,6 @@ export default function AdminDashboard() {
             setStats({ total: conData.length, pending, complete });
         } catch (error: any) {
             console.error("Terminal Sync Error:", error);
-            // alert(`Sync Error: ${error.message}`);
         } finally {
             setLoading(false);
         }
@@ -120,13 +119,10 @@ export default function AdminDashboard() {
             setRazorpayEnabled(s.razorpay_enabled);
             setPackPrice(s.pack_price);
             setPackCredits(s.pack_credits);
-            setPackCredits(s.pack_credits);
-            if (s.ai_model) setAiModel(s.ai_model);
             if (s.ai_model) setAiModel(s.ai_model);
             if (s.system_prompt) setSystemPrompt(s.system_prompt);
             if (s.is_prompt_active !== undefined) setIsPromptActive(s.is_prompt_active);
         }).catch(() => {
-            // Siltently fail if settings table issue, defaults are used
             console.warn("Settings table might need update");
         });
     }, []);
@@ -197,7 +193,20 @@ export default function AdminDashboard() {
         if (!selectedUserForCredits) return;
         setUpdatingCredits(true);
         try {
-            await creditService.updateUserCredits(selectedUserForCredits.id, newCreditBalance);
+            const response = await fetch('/api/admin/credits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: selectedUserForCredits.id,
+                    credits: newCreditBalance
+                })
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || "Update failed");
+            }
+
             setUserCredits(prev => ({ ...prev, [selectedUserForCredits.id]: newCreditBalance }));
             setSelectedUserForCredits(null);
             alert("Credits updated successfully.");
@@ -324,968 +333,405 @@ export default function AdminDashboard() {
     };
 
     return (
-        <main className="min-h-screen bg-slate-50 pt-32 pb-40 px-6">
-            <div className="max-w-[1600px] mx-auto space-y-10">
+        <main className="fixed inset-0 w-screen h-screen bg-slate-50 flex flex-col overflow-hidden selection:bg-indigo-100/50">
+            {/* Background Pattern - subtle noise/grid */}
+            <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+            }}></div>
 
-                {/* Header & Stats */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-3">
-                            <ShieldCheck className="w-8 h-8 text-indigo-600" />
-                            <h1 className="text-3xl font-bold text-slate-900 tracking-tighter uppercase">Operations Hub</h1>
-                        </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] pl-11">Pariharam Global Control Surface</p>
+            {/* Top Navigation Bar - Fixed */}
+            <header className="shrink-0 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-6 z-40 relative">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                        <ShieldCheck className="w-6 h-6" />
                     </div>
-
-                    <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
-                        <button
-                            onClick={() => setActiveTab('consultations')}
-                            className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'consultations' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Consultations
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('staff')}
-                            className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'staff' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Staff Management
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('users')}
-                            className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Users
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('settings')}
-                            className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'settings' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Settings
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('ai-config')}
-                            className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'ai-config' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            AI Config
-                        </button>
-                        <div className="w-px h-6 bg-slate-200 mx-1 self-center" />
-                        <button
-                            onClick={handleLogout}
-                            className="px-4 py-2 text-slate-400 hover:text-rose-500 transition-colors flex items-center"
-                            title="Sign Out"
-                        >
-                            <LogOut className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-3">
-                        <StatCard icon={<Database className="w-4 h-4" />} label="Inquiries" value={stats.total} color="bg-slate-900" />
-                        <StatCard icon={<Clock className="w-4 h-4" />} label="Pending" value={stats.pending} color="bg-amber-600" />
-                        <StatCard icon={<CheckCircle2 className="w-4 h-4" />} label="Staff" value={astrologers.length} color="bg-indigo-600" />
-                        <StatCard icon={<Users className="w-4 h-4" />} label="Total Users" value={allUsers.length} color="bg-emerald-600" />
+                    <div>
+                        <h1 className="text-base font-bold text-slate-900 uppercase tracking-widest leading-none">Command Center</h1>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Pariharam Admin</p>
                     </div>
                 </div>
 
-                {/* Operations Grid */}
-                <AnimatePresence mode="wait">
-                    {activeTab === 'consultations' && (
-                        <motion.div
-                            key="consultations"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden"
+                <nav className="flex items-center bg-slate-100/50 p-1.5 rounded-xl">
+                    {[
+                        { id: 'consultations', label: 'Pipeline' },
+                        { id: 'staff', label: 'Staff' },
+                        { id: 'users', label: 'Users' },
+                        { id: 'settings', label: 'Config' },
+                        { id: 'ai-config', label: 'Intelligence' }
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={`px-5 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${activeTab === tab.id
+                                ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-black/5'
+                                : 'text-slate-500 hover:text-slate-900'
+                                }`}
                         >
-                            <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-sm">
-                                        <Activity className="w-5 h-5 text-indigo-600" />
-                                    </div>
-                                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Global Pipeline</h2>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="relative group hidden md:block">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                                        <input placeholder="Search ID, Name..." className="bg-white border border-slate-200 rounded-full py-2 pl-10 pr-4 text-[10px] font-bold uppercase tracking-widest focus:border-indigo-600 transition-all outline-none w-64 shadow-inner" />
-                                    </div>
-                                    <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
-                                        <Loader2 className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
-                                    </button>
-                                </div>
-                            </div>
+                            {tab.label}
+                        </button>
+                    ))}
+                </nav>
 
-                            {loading ? (
-                                <div className="p-32 flex flex-col items-center justify-center space-y-4">
-                                    <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Syncing Pipeline...</p>
+                <div className="flex items-center gap-4">
+                    <div className="hidden lg:flex items-center gap-6 px-6 border-l border-slate-200 h-10">
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Inquiries</span>
+                            <span className="text-lg font-bold text-slate-900 leading-none">{stats.total}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pending</span>
+                            <span className="text-lg font-bold text-amber-600 leading-none">{stats.pending}</span>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all border border-transparent hover:border-red-100"
+                        title="Sign Out"
+                    >
+                        <LogOut className="w-4 h-4" />
+                    </button>
+                </div>
+            </header>
+
+            {/* Scrollable Main Content */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 relative z-10">
+                <div className="max-w-[1600px] mx-auto space-y-6 pb-20">
+
+                    <AnimatePresence mode="wait">
+                        {activeTab === 'consultations' && (
+                            <motion.div
+                                key="consultations"
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                transition={{ duration: 0.2 }}
+                                className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden"
+                            >
+                                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm">
+                                            <Activity className="w-5 h-5 text-indigo-600" />
+                                        </div>
+                                        <h2 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Consultation Queue</h2>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative group">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <input
+                                                placeholder="Search pipeline..."
+                                                className="h-10 bg-white border border-slate-200 rounded-lg py-0 pl-10 pr-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-600 transition-all outline-none w-56"
+                                            />
+                                        </div>
+                                        <button onClick={fetchData} className="p-2.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                                            <Loader2 className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
+                                        </button>
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="overflow-x-auto">
+
+                                {loading ? (
+                                    <div className="h-64 flex flex-col items-center justify-center space-y-3">
+                                        <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Syncing Data...</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead>
+                                                <tr className="border-b border-slate-100 bg-slate-50/30">
+                                                    <th className="px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Seeker</th>
+                                                    <th className="px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Inquiry Context</th>
+                                                    <th className="px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                                                    <th className="px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Expert Assigned</th>
+                                                    <th className="px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {consultations.map((c) => (
+                                                    <tr key={c.id} className="hover:bg-slate-50/80 transition-colors group">
+                                                        <td className="px-6 py-4">
+                                                            <div className="space-y-0.5">
+                                                                <p className="text-sm font-bold text-slate-900">{c.users?.full_name}</p>
+                                                                <p className="text-xs font-medium text-slate-400">{c.users?.email}</p>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="space-y-1">
+                                                                <div className="flex gap-1 flex-wrap">
+                                                                    {c.categories.map((cat: string) => (
+                                                                        <span key={cat} className="text-xs px-2 py-0.5 bg-slate-100 rounded text-slate-600 font-bold uppercase">{cat}</span>
+                                                                    ))}
+                                                                </div>
+                                                                <p className="text-xs text-slate-400 italic truncate max-w-[200px]">"{c.comments}"</p>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-widest border ${c.status === 'completed' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
+                                                                c.status === 'pending_admin' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
+                                                                    c.status === 'reviewing' ? 'bg-blue-50 border-blue-100 text-blue-600' :
+                                                                        'bg-amber-50 border-amber-100 text-amber-600'
+                                                                }`}>
+                                                                <div className={`w-2 h-2 rounded-full ${c.status === 'completed' ? 'bg-emerald-500' : c.status === 'pending_admin' ? 'bg-indigo-500' : 'bg-amber-500'}`} />
+                                                                {c.status.replace('_', ' ')}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <select
+                                                                value={c.assigned_astrologer_id || ""}
+                                                                onChange={(e) => handleAssign(c.id, e.target.value)}
+                                                                disabled={c.status === 'completed'}
+                                                                className="h-8 bg-white border border-slate-200 rounded-lg px-2 text-[10px] font-bold uppercase tracking-wide focus:border-indigo-600 outline-none w-full max-w-[140px]"
+                                                            >
+                                                                <option value="">-- Select --</option>
+                                                                {astrologers.map(a => (
+                                                                    <option key={a.id} value={a.id}>{a.full_name}</option>
+                                                                ))}
+                                                            </select>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            {c.status === 'pending_admin' ? (
+                                                                <button
+                                                                    onClick={() => handleOpenReview(c)}
+                                                                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm"
+                                                                >
+                                                                    Review
+                                                                </button>
+                                                            ) : (
+                                                                <button className="px-3 py-1.5 text-slate-300 hover:text-indigo-600 bg-transparent hover:bg-indigo-50 rounded-lg transition-all">
+                                                                    <ArrowUpRight className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'staff' && (
+                            <motion.div
+                                key="staff"
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+                            >
+                                <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                                    <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-1.5 bg-white border border-slate-200 rounded-lg shadow-sm">
+                                                <Users className="w-4 h-4 text-indigo-600" />
+                                            </div>
+                                            <h2 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Staff Directory</h2>
+                                        </div>
+                                    </div>
+                                    <div className="p-1">
+                                        {astrologers.map(a => (
+                                            <div key={a.id} className="p-3 hover:bg-slate-50 rounded-xl flex items-center justify-between group transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">
+                                                        {a.full_name?.[0]}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-900">{a.full_name}</p>
+                                                        <p className="text-xs text-slate-400">{a.email}</p>
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => handleRemoveStaff(a.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-5 h-fit">
+                                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Add New Expert</h3>
+                                    <div className="space-y-4">
+                                        <input
+                                            value={newStaffName}
+                                            onChange={(e) => setNewStaffName(e.target.value)}
+                                            placeholder="Full Name"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:border-indigo-600 outline-none"
+                                        />
+                                        <input
+                                            value={newStaffEmail}
+                                            onChange={(e) => setNewStaffEmail(e.target.value)}
+                                            placeholder="Email Address"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:border-indigo-600 outline-none"
+                                        />
+                                        <input
+                                            value={newStaffPassword}
+                                            onChange={(e) => setNewStaffPassword(e.target.value)}
+                                            placeholder="Temporary Password"
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:border-indigo-600 outline-none"
+                                        />
+                                        <button
+                                            onClick={handleCreateConsultant}
+                                            disabled={addingStaff}
+                                            className="w-full bg-slate-900 text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-600 transition-all flex justify-center"
+                                        >
+                                            {addingStaff ? <Loader2 className="w-4 h-4 animate-spin" /> : "Provision Account"}
+                                        </button>
+                                        {addSuccess && <p className="text-xs text-emerald-600 font-bold text-center">{addSuccess}</p>}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'users' && (
+                            <motion.div
+                                key="users"
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden"
+                            >
+                                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                    <h2 className="text-sm font-bold text-slate-700 uppercase tracking-widest">User Database</h2>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <input
+                                            value={usersTabSearch}
+                                            onChange={(e) => setUsersTabSearch(e.target.value)}
+                                            placeholder="Search users..."
+                                            className="h-10 bg-white border border-slate-200 rounded-lg py-0 pl-10 pr-4 text-xs font-bold uppercase tracking-widest focus:border-indigo-600 transition-all outline-none w-64"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto max-h-[70vh]">
                                     <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="border-b border-slate-100 italic bg-slate-50/20">
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Profile</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Context</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assignment</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
+                                        <thead className="sticky top-0 bg-slate-50 z-10 shadow-sm">
+                                            <tr>
+                                                <th className="px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Identity</th>
+                                                <th className="px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Role</th>
+                                                <th className="px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Credits</th>
+                                                <th className="px-6 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Controls</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
-                                            {consultations.map((c) => (
-                                                <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="px-8 py-6">
-                                                        <div className="space-y-1">
-                                                            <p className="text-[13px] font-bold text-slate-900 uppercase tracking-tight">{c.users?.full_name}</p>
-                                                            <p className="text-[10px] font-medium text-slate-400">{c.users?.email}</p>
+                                            {allUsers.filter(u => !usersTabSearch || u.email.includes(usersTabSearch) || u.full_name?.includes(usersTabSearch)).map(u => (
+                                                <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-6 py-3">
+                                                        <div className="space-y-0.5">
+                                                            <p className="text-sm font-bold text-slate-900">{u.full_name || 'Guest'}</p>
+                                                            <p className="text-xs text-slate-400">{u.email}</p>
                                                         </div>
                                                     </td>
-                                                    <td className="px-8 py-6">
-                                                        <div className="space-y-1">
-                                                            <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-widest">{c.categories.join(' • ')}</p>
-                                                            <p className="text-[10px] font-medium text-slate-400 italic truncate max-w-[200px]">"{c.comments}"</p>
-                                                        </div>
+                                                    <td className="px-6 py-3">
+                                                        <span className="px-2.5 py-1 border rounded text-xs font-bold uppercase tracking-wide text-slate-500">{u.role}</span>
                                                     </td>
-                                                    <td className="px-8 py-6">
-                                                        <div className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${c.status === 'completed' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
-                                                            c.status === 'pending_admin' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
-                                                                c.status === 'reviewing' ? 'bg-blue-50 border-blue-100 text-blue-600' :
-                                                                    'bg-amber-50 border-amber-100 text-amber-600'
-                                                            }`}>
-                                                            {c.status === 'completed' ? 'Published' :
-                                                                c.status === 'pending_admin' ? 'Review Required' :
-                                                                    c.status === 'reviewing' ? 'In Progress' :
-                                                                        'Pending'}
-                                                        </div>
+                                                    <td className="px-6 py-3">
+                                                        <span className="text-xs font-mono font-medium text-slate-700">{userCredits[u.id] || 0}</span>
                                                     </td>
-                                                    <td className="px-8 py-6">
-                                                        <select
-                                                            value={c.assigned_astrologer_id || ""}
-                                                            onChange={(e) => handleAssign(c.id, e.target.value)}
-                                                            disabled={c.status === 'completed' || c.status === 'pending_admin'}
-                                                            className="bg-white border border-slate-200 rounded-lg py-1.5 px-3 text-[11px] font-bold uppercase tracking-widest focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-600 outline-none transition-all shadow-sm disabled:opacity-50"
+                                                    <td className="px-6 py-3 text-right flex justify-end gap-2">
+                                                        <button
+                                                            onClick={() => { setSelectedUserForCredits(u); setNewCreditBalance(userCredits[u.id] || 0); }}
+                                                            className="p-2 hover:bg-amber-50 text-slate-400 hover:text-amber-600 rounded-lg transition-colors"
+                                                            title="Edit Credits"
                                                         >
-                                                            <option value="">Unassigned</option>
-                                                            {astrologers.map(a => (
-                                                                <option key={a.id} value={a.id}>{a.full_name}</option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-                                                    <td className="px-8 py-6 text-right">
-                                                        {c.status === 'pending_admin' ? (
-                                                            <button
-                                                                onClick={() => handleOpenReview(c)}
-                                                                className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg"
-                                                            >
-                                                                Review & Publish
-                                                            </button>
-                                                        ) : (
-                                                            <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-lg transition-all">
-                                                                <ArrowUpRight className="w-4 h-4" />
-                                                            </button>
-                                                        )}
+                                                            <Coins className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            className="p-2 hover:bg-slate-100 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+                                                            title="Block / Delete"
+                                                            onClick={() => handleRemoveStaff(u.id)} // Reusing the destructive modal for simplicity or create new one
+                                                        >
+                                                            <Shield className="w-4 h-4" />
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
-                            )}
-                        </motion.div>
-                    )}
+                            </motion.div>
+                        )}
 
-                    {activeTab === 'staff' && (
-                        <motion.div
-                            key="staff"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="space-y-6"
-                        >
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden">
-                                    <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-sm">
-                                                <Users className="w-5 h-5 text-indigo-600" />
-                                            </div>
-                                            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Active Consultants</h2>
-                                        </div>
+                        {activeTab === 'settings' && (
+                            <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-3xl mx-auto space-y-6">
+                                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-base font-bold text-slate-900">Razorpay Payments</h3>
+                                        <p className="text-xs text-slate-500">Toggle between live charging and simulation mode.</p>
                                     </div>
-                                    <div className="divide-y divide-slate-50">
-                                        {astrologers.length > 0 ? astrologers.map(a => (
-                                            <div key={a.id} className="p-6 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 font-bold uppercase">
-                                                        {a.full_name?.[0]}
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <p className="text-sm font-bold text-slate-900 uppercase tracking-tight">{a.full_name}</p>
-                                                        <p className="text-[10px] font-medium text-slate-400">{a.email}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-4">
-                                                    <span className="px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-full text-[9px] font-bold text-indigo-600 uppercase tracking-widest">Astrologer</span>
-                                                    <button
-                                                        onClick={() => handleRemoveStaff(a.id)}
-                                                        className="p-2 text-slate-300 hover:text-red-500 transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )) : (
-                                            <div className="p-20 text-center space-y-4">
-                                                <AlertTriangle className="w-8 h-8 text-slate-200 mx-auto" />
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No Active Consultants</p>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <button
+                                        onClick={toggleRazorpay}
+                                        className={`w-14 h-8 rounded-full p-1 transition-colors ${razorpayEnabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                                    >
+                                        <div className={`w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${razorpayEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                                    </button>
                                 </div>
 
-                                <div className="bg-white border border-slate-200 rounded-3xl shadow-xl p-8 space-y-6">
-                                    <div className="space-y-2">
-                                        <h3 className="text-lg font-bold text-slate-900 uppercase tracking-tighter">Provision New Consultant</h3>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Create Account & Set Password</p>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-start gap-4">
-                                            <ShieldCheck className="w-4 h-4 text-indigo-500 mt-0.5" />
-                                            <p className="text-[10px] text-indigo-500 font-medium leading-relaxed">
-                                                Use this to create an account for a new astrologer. Once created, you can give them the password to log in directly to the Job Dashboard.
-                                            </p>
-                                        </div>
-
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                                        <h3 className="text-base font-bold text-slate-900">Pricing Logic</h3>
                                         <div className="space-y-4">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Full Name</label>
-                                                <input
-                                                    type="text"
-                                                    value={newStaffName}
-                                                    onChange={(e) => setNewStaffName(e.target.value)}
-                                                    placeholder="Dr. Arjun Sharma"
-                                                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-medium focus:border-indigo-600 transition-all outline-none"
-                                                />
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-400 uppercase">Pack Price (₹)</label>
+                                                <input type="number" value={packPrice} onChange={e => setPackPrice(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-base font-bold" />
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Email Address</label>
-                                                <input
-                                                    type="email"
-                                                    value={newStaffEmail}
-                                                    onChange={(e) => setNewStaffEmail(e.target.value)}
-                                                    placeholder="arjun@pariharam.com"
-                                                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-medium focus:border-indigo-600 transition-all outline-none"
-                                                />
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-400 uppercase">Credits / Pack</label>
+                                                <input type="number" value={packCredits} onChange={e => setPackCredits(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-base font-bold" />
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Security Code (Password)</label>
-                                                <input
-                                                    type="text"
-                                                    value={newStaffPassword}
-                                                    onChange={(e) => setNewStaffPassword(e.target.value)}
-                                                    placeholder="Set initial password"
-                                                    className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-medium focus:border-indigo-600 transition-all outline-none"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {addError && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest bg-red-50 p-2 rounded-lg border border-red-100">{addError}</p>}
-                                        {addSuccess && <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 p-2 rounded-lg border border-emerald-100">{addSuccess}</p>}
-
-                                        <button
-                                            onClick={handleCreateConsultant}
-                                            disabled={addingStaff || !newStaffEmail || !newStaffPassword}
-                                            className="w-full bg-slate-900 hover:bg-indigo-600 text-white py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-lg hover:shadow-indigo-500/10 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-                                        >
-                                            {addingStaff ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                                            Authorize Consultant
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {activeTab === 'settings' && (
-                        <motion.div
-                            key="settings"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="space-y-6"
-                        >
-                            <div className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden max-w-2xl">
-                                <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-sm">
-                                            <Settings className="w-5 h-5 text-indigo-900" />
-                                        </div>
-                                        <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">System Configuration</h2>
-                                    </div>
-                                </div>
-                                <div className="p-8">
-                                    <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between">
-                                        <div className="space-y-1">
-                                            <h3 className="text-sm font-bold text-indigo-900">Razorpay Live Payments</h3>
-                                            <p className="text-xs font-medium text-indigo-600/80 max-w-md">
-                                                Enable to process real transactions via Razorpay. Disable to use Payment Simulation Mode for testing (free credits).
-                                            </p>
-                                            <div className="pt-2">
-                                                <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md ${razorpayEnabled ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                                                    Current Mode: {razorpayEnabled ? 'Live & Charging' : 'Simulation & Free'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={toggleRazorpay}
-                                            className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${razorpayEnabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
-                                        >
-                                            <span className="sr-only">Use setting</span>
-                                            <span
-                                                aria-hidden="true"
-                                                className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${razorpayEnabled ? 'translate-x-6' : 'translate-x-0'}`}
-                                            />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="p-8 border-t border-slate-100">
-                                    <div className="flex flex-col lg:flex-row gap-6">
-                                        {/* Pricing Settings */}
-                                        <div className="flex-1 p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-6">
-                                            <div className="space-y-1">
-                                                <h3 className="text-sm font-bold text-slate-900">Standard Pack Pricing</h3>
-                                                <p className="text-xs font-medium text-slate-500">Configure the cost and credit value for the standard recharge pack.</p>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Price (₹)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={packPrice}
-                                                        onChange={(e) => setPackPrice(Number(e.target.value))}
-                                                        className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold focus:border-indigo-600 transition-all outline-none"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Credits</label>
-                                                    <input
-                                                        type="number"
-                                                        value={packCredits}
-                                                        onChange={(e) => setPackCredits(Number(e.target.value))}
-                                                        className="w-full bg-white border border-slate-200 rounded-xl p-3 text-sm font-bold focus:border-indigo-600 transition-all outline-none"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={savePricing}
-                                                className="bg-slate-900 text-white py-4 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-indigo-500/10 active:scale-95"
-                                            >
-                                                Update Pricing
-                                            </button>
-                                        </div>
-
-                                        {/* AI Model Settings */}
-                                        <div className="flex-1 p-6 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col gap-6">
-                                            <div className="space-y-1">
-                                                <h3 className="text-sm font-bold text-slate-900">AI Model Engine</h3>
-                                                <p className="text-xs font-medium text-slate-500">Select which LLM powers the astrological analysis.</p>
-                                            </div>
-
-                                            <div className="space-y-3">
-                                                <div
-                                                    onClick={() => setAiModel('gpt-4o')}
-                                                    className={`p-4 border rounded-xl cursor-pointer transition-all flex items-center justify-between ${aiModel === 'gpt-4o' ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
-                                                >
-                                                    <span className={`text-xs font-bold uppercase tracking-widest ${aiModel === 'gpt-4o' ? 'text-indigo-700' : 'text-slate-500'}`}>GPT-4o (OpenAI)</span>
-                                                    {aiModel === 'gpt-4o' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
-                                                </div>
-
-                                                <div
-                                                    onClick={() => setAiModel('gemini-2.5-flash')}
-                                                    className={`p-4 border rounded-xl cursor-pointer transition-all flex items-center justify-between ${aiModel === 'gemini-2.5-flash' ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white border-slate-200 hover:bg-slate-50'}`}
-                                                >
-                                                    <span className={`text-xs font-bold uppercase tracking-widest ${aiModel === 'gemini-2.5-flash' ? 'text-indigo-700' : 'text-slate-500'}`}>Gemini 2.5 Flash</span>
-                                                    {aiModel === 'gemini-2.5-flash' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
-                                                </div>
-                                            </div>
-
-                                            <button
-                                                onClick={saveModel}
-                                                className="mt-auto bg-slate-900 text-white py-4 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-indigo-500/10 active:scale-95"
-                                            >
-                                                Save Model Preference
-                                            </button>
+                                            <button onClick={savePricing} className="w-full py-3 bg-slate-900 text-white rounded-lg text-xs font-bold uppercase tracking-widest">Update config</button>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
 
-                    {activeTab === 'ai-config' && (
-                        <motion.div
-                            key="ai-config"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden"
-                        >
-                            <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-sm">
-                                        <Bot className="w-5 h-5 text-indigo-600" />
-                                    </div>
-                                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">AI Brain & Logs</h2>
-                                </div>
-                                <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
-                                    <Loader2 className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
-                                </button>
-                            </div>
-
-                            <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                {/* Prompt Editor */}
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-1">
-                                            <h3 className="text-sm font-bold text-slate-900">System Prompt</h3>
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-[10px] font-medium text-slate-400">Master instructions for the AI persona.</p>
-                                                {/* Toggle Switch */}
-                                                <button
-                                                    onClick={togglePromptActive}
-                                                    className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isPromptActive ? 'bg-indigo-600' : 'bg-slate-200'}`}
-                                                    title={isPromptActive ? "Prompt is ACTIVE" : "Prompt is OFF (Raw Mode)"}
-                                                >
-                                                    <span className="sr-only">Toggle Prompt</span>
-                                                    <span
-                                                        aria-hidden="true"
-                                                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isPromptActive ? 'translate-x-4' : 'translate-x-0'}`}
-                                                    />
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                                        <h3 className="text-base font-bold text-slate-900">AI Model</h3>
+                                        <div className="space-y-3">
+                                            {['gpt-4o', 'gemini-2.0-flash', 'gemini-2.5-flash'].map(m => (
+                                                <button key={m} onClick={() => setAiModel(m)} className={`w-full py-3 px-4 rounded-lg border text-left flex items-center justify-between ${aiModel === m ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'border-slate-200 text-slate-600'}`}>
+                                                    <span className="text-xs font-bold uppercase tracking-widest">{m}</span>
+                                                    {aiModel === m && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
                                                 </button>
-                                                <span className={`text-[9px] font-bold uppercase tracking-wider ${isPromptActive ? 'text-indigo-600' : 'text-slate-400'}`}>
-                                                    {isPromptActive ? "Active" : "Disabled (Raw)"}
-                                                </span>
-                                            </div>
+                                            ))}
+                                            <button onClick={saveModel} className="w-full py-2 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest mt-2">Save Preference</button>
                                         </div>
-                                        <button
-                                            onClick={savePrompt}
-                                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"
-                                        >
-                                            Save Prompt
-                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {activeTab === 'ai-config' && (
+                            <motion.div key="ai-config" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-[calc(100vh-140px)] grid grid-cols-2 gap-6">
+                                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
+                                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">System Prompt</h3>
+                                        <button onClick={savePrompt} className="px-4 py-1.5 bg-indigo-600 text-white rounded-md text-xs font-bold uppercase tracking-widest">Save</button>
                                     </div>
                                     <textarea
                                         value={systemPrompt}
-                                        onChange={(e) => setSystemPrompt(e.target.value)}
-                                        className="w-full h-[600px] bg-slate-50 border border-slate-200 rounded-xl p-4 font-mono text-xs text-slate-700 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 outline-none leading-relaxed resize-none"
-                                        placeholder="Enter system prompt here..."
+                                        onChange={e => setSystemPrompt(e.target.value)}
+                                        className="flex-1 p-6 text-sm font-mono text-slate-800 resize-none outline-none leading-relaxed"
+                                        placeholder="Define AI persona..."
                                     />
-                                    <p className="text-[10px] text-slate-400 italic">
-                                        You can use variables like {'${currentDate}'} but mostly the context is injected automatically after this prompt.
-                                    </p>
                                 </div>
-
-                                {/* Chat Logs Section */}
-                                <div className="space-y-4 flex flex-col h-[700px]">
-                                    <div className="flex flex-col gap-3 shrink-0">
-                                        <div className="space-y-1">
-                                            <h3 className="text-sm font-bold text-slate-900">Recent Test Logs</h3>
-                                            <p className="text-[10px] font-medium text-slate-400">Live feed of AI interactions.</p>
-                                        </div>
-
-                                        {/* Log Filters */}
-                                        <div className="flex items-center gap-2">
-                                            <div className="relative flex-1">
-                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                                                <input
-                                                    placeholder="Search logs..."
-                                                    value={logSearch}
-                                                    onChange={(e) => setLogSearch(e.target.value)}
-                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-9 pr-4 text-[10px] font-medium focus:border-indigo-600 transition-all outline-none"
-                                                />
+                                <div className="bg-slate-900 rounded-2xl shadow-sm flex flex-col overflow-hidden border border-slate-800">
+                                    <div className="p-3 border-b border-slate-800 bg-slate-900 flex justify-between items-center">
+                                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Logs</h3>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                        {chatLogs.map(log => (
+                                            <div key={log.id} onClick={() => setSelectedLog(log)} className="p-3 rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 cursor-pointer">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="text-[9px] font-bold text-indigo-400 uppercase">{log.user_id.slice(0, 8)}</span>
+                                                    <span className="text-[9px] font-mono text-slate-500">{new Date(log.created_at).toLocaleTimeString()}</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-300 line-clamp-2">{log.user_message}</p>
                                             </div>
-                                            <select
-                                                value={logFilterUser}
-                                                onChange={(e) => setLogFilterUser(e.target.value)}
-                                                className="bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-[10px] font-bold uppercase tracking-widest focus:border-indigo-600 outline-none max-w-[150px]"
-                                            >
-                                                <option value="all">All Users</option>
-                                                {/* Unique users from logs */}
-                                                {Array.from(new Set(chatLogs.map(l => l.user_id))).map(uid => {
-                                                    const u = allUsers.find(au => au.id === uid);
-                                                    return (
-                                                        <option key={uid} value={uid}>
-                                                            {u ? (u.full_name || u.email) : uid.slice(0, 8) + '...'}
-                                                        </option>
-                                                    );
-                                                })}
-                                            </select>
-                                        </div>
+                                        ))}
                                     </div>
-
-                                    <div className="flex-1 bg-slate-900 rounded-xl overflow-hidden flex flex-col">
-                                        <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-thin scrollbar-thumb-slate-700">
-                                            {chatLogs.length === 0 ? (
-                                                <div className="text-center p-10 text-slate-500 text-xs">No logs found.</div>
-                                            ) : (
-                                                chatLogs
-                                                    .filter(log => {
-                                                        const user = allUsers.find(u => u.id === log.user_id);
-                                                        const userName = user?.full_name || user?.email || "Unknown";
-                                                        const searchContent = (log.user_message + log.ai_response + userName).toLowerCase();
-                                                        const matchesSearch = searchContent.includes(logSearch.toLowerCase());
-                                                        const matchesUser = logFilterUser === 'all' || log.user_id === logFilterUser;
-                                                        return matchesSearch && matchesUser;
-                                                    })
-                                                    .map((log) => {
-                                                        const user = allUsers.find(u => u.id === log.user_id);
-                                                        return (
-                                                            <div
-                                                                key={log.id}
-                                                                onClick={() => setSelectedLog(log)}
-                                                                className="bg-slate-800/50 hover:bg-slate-800 cursor-pointer rounded-lg p-3 border border-slate-700/50 transition-colors group"
-                                                            >
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px] text-indigo-400 font-bold uppercase">
-                                                                            {user?.email?.[0] || "?"}
-                                                                        </div>
-                                                                        <span className="text-[10px] font-bold text-slate-300">
-                                                                            {user?.full_name || user?.email || "Unknown User"}
-                                                                        </span>
-                                                                    </div>
-                                                                    <span className="text-[9px] font-mono text-slate-500">{new Date(log.created_at).toLocaleTimeString()}</span>
-                                                                </div>
-
-                                                                <p className="text-[11px] text-slate-400 line-clamp-2 pl-7 group-hover:text-slate-300 transition-colors">
-                                                                    <span className="text-indigo-500 font-mono text-[9px] mr-1">USR:</span>
-                                                                    {log.user_message}
-                                                                </p>
-                                                            </div>
-                                                        );
-                                                    })
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Log Details Modal */}
-                                <AnimatePresence>
-                                    {selectedLog && (
-                                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-                                            <motion.div
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.95 }}
-                                                className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"
-                                            >
-                                                {/* Header */}
-                                                <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                                                    <div>
-                                                        <h3 className="text-lg font-bold text-slate-900">Interaction Details</h3>
-                                                        <p className="text-xs text-slate-500 font-mono">ID: {selectedLog.id} • {selectedLog.model} • {new Date(selectedLog.created_at).toLocaleString()}</p>
-                                                    </div>
-                                                    <button onClick={() => setSelectedLog(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                                                        <X className="w-5 h-5 text-slate-500" />
-                                                    </button>
-                                                </div>
-
-                                                {/* Content */}
-                                                <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                                                    {/* User Message */}
-                                                    <div className="space-y-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="p-1.5 bg-indigo-100 rounded-md">
-                                                                <Users className="w-4 h-4 text-indigo-700" />
-                                                            </div>
-                                                            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">User Query</span>
-                                                        </div>
-                                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-800 leading-relaxed font-medium">
-                                                            {selectedLog.user_message}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* AI Response */}
-                                                    <div className="space-y-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="p-1.5 bg-emerald-100 rounded-md">
-                                                                <Bot className="w-4 h-4 text-emerald-700" />
-                                                            </div>
-                                                            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Parihaaram Response</span>
-                                                        </div>
-                                                        <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
-                                                            {selectedLog.ai_response}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Meta Details */}
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                        <div className="space-y-2">
-                                                            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Context Data</span>
-                                                            <div className="bg-slate-900 rounded-xl p-4 overflow-auto max-h-60 border border-slate-800">
-                                                                <pre className="text-[10px] text-amber-500 font-mono whitespace-pre-wrap">
-                                                                    {selectedLog.context_snapshot ? JSON.stringify(JSON.parse(selectedLog.context_snapshot), null, 2) : "No context captured."}
-                                                                </pre>
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">System Prompt Snapshot</span>
-                                                            <div className="bg-slate-900 rounded-xl p-4 overflow-auto max-h-60 border border-slate-800">
-                                                                <pre className="text-[10px] text-slate-400 font-mono whitespace-pre-wrap">
-                                                                    {selectedLog.system_prompt_snapshot || "No prompt snapshot."}
-                                                                </pre>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        </div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {
-                        activeTab === 'users' && (
-                            <motion.div
-                                key="users"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden"
-                            >
-                                <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-2 bg-white border border-slate-200 rounded-xl shadow-sm">
-                                            <Users className="w-5 h-5 text-indigo-600" />
-                                        </div>
-                                        <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">User Management</h2>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="relative group hidden md:block">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                                            <input
-                                                value={usersTabSearch}
-                                                onChange={(e) => setUsersTabSearch(e.target.value)}
-                                                placeholder="Search Name, Email, ID..."
-                                                className="bg-white border border-slate-200 rounded-full py-2 pl-10 pr-4 text-[10px] font-bold uppercase tracking-widest focus:border-indigo-600 transition-all outline-none w-64 shadow-inner"
-                                            />
-                                        </div>
-                                        <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
-                                            <Loader2 className={`w-4 h-4 text-slate-600 ${loading ? 'animate-spin' : ''}`} />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="border-b border-slate-100 italic bg-slate-50/20">
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">User Details</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Role</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Balance</th>
-                                                <th className="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {allUsers
-                                                .filter(u =>
-                                                    !usersTabSearch ||
-                                                    (u.full_name?.toLowerCase().includes(usersTabSearch.toLowerCase()) ||
-                                                        u.email.toLowerCase().includes(usersTabSearch.toLowerCase()) ||
-                                                        u.id.includes(usersTabSearch))
-                                                )
-                                                .map((u) => (
-                                                    <tr key={u.id} className="hover:bg-slate-50/50 transition-colors group">
-                                                        <td className="px-8 py-6">
-                                                            <div className="space-y-1">
-                                                                <p className="text-[13px] font-bold text-slate-900 uppercase tracking-tight">{u.full_name || 'Guest User'}</p>
-                                                                <div className="flex items-center gap-2">
-                                                                    <p className="text-[10px] font-medium text-slate-400 flex items-center gap-2">
-                                                                        <Mail className="w-3 h-3" /> {u.email}
-                                                                    </p>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            navigator.clipboard.writeText(u.id);
-                                                                            alert("User ID copied");
-                                                                        }}
-                                                                        className="text-[9px] font-mono text-slate-300 hover:text-indigo-500 cursor-pointer"
-                                                                    >
-                                                                        ID: {u.id.slice(0, 8)}...
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-8 py-6">
-                                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${u.role === 'admin' ? 'bg-purple-50 border-purple-100 text-purple-600' :
-                                                                u.role === 'astrologer' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
-                                                                    'bg-slate-50 border-slate-100 text-slate-500'
-                                                                }`}>
-                                                                {u.role}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-8 py-6">
-                                                            <div className="flex items-center gap-2">
-                                                                <Coins className="w-4 h-4 text-amber-500" />
-                                                                <span className="text-sm font-bold text-slate-900">{userCredits[u.id] || 0}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-8 py-6 text-right">
-                                                            <div className="flex items-center justify-end gap-3">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setSelectedUserForCredits(u);
-                                                                        setNewCreditBalance(userCredits[u.id] || 0);
-                                                                    }}
-                                                                    className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
-                                                                    title="Manage Credits"
-                                                                >
-                                                                    <Coins className="w-4 h-4" />
-                                                                </button>
-
-                                                                <div className="w-px h-4 bg-slate-200" />
-
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        setConfirmationState({
-                                                                            isOpen: true,
-                                                                            title: "Generate Magic Link",
-                                                                            message: `Generate a secure login link for ${u.email}? This will allow you to log in as them immediately.`,
-                                                                            isDestructive: false,
-                                                                            confirmText: "Generate Link",
-                                                                            onConfirm: async () => {
-                                                                                try {
-                                                                                    const res = await fetch('/api/admin/users', {
-                                                                                        method: 'POST',
-                                                                                        headers: { 'Content-Type': 'application/json' },
-                                                                                        body: JSON.stringify({ action: 'magic_link', email: u.email })
-                                                                                    });
-                                                                                    const data = await res.json();
-                                                                                    if (data.link) {
-                                                                                        window.open(data.link, '_blank');
-                                                                                        // alert("User accessed in new tab via Magic Link."); // Keeping it non-intrusive
-                                                                                    } else {
-                                                                                        throw new Error(data.error);
-                                                                                    }
-                                                                                } catch (e: any) {
-                                                                                    alert("Access failed: " + e.message);
-                                                                                }
-                                                                            }
-                                                                        });
-                                                                    }}
-                                                                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                                                    title="Access Account (Magic Link)"
-                                                                >
-                                                                    <LogOut className="w-4 h-4 rotate-180" />
-                                                                </button>
-
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        setConfirmationState({
-                                                                            isOpen: true,
-                                                                            title: "Block User Account",
-                                                                            message: `Are you sure you want to BLOCK ${u.email}? They will not be able to log in.`,
-                                                                            isDestructive: true,
-                                                                            confirmText: "Block User",
-                                                                            onConfirm: async () => {
-                                                                                try {
-                                                                                    await fetch('/api/admin/users', {
-                                                                                        method: 'POST',
-                                                                                        headers: { 'Content-Type': 'application/json' },
-                                                                                        body: JSON.stringify({ action: 'block', userId: u.id })
-                                                                                    });
-                                                                                    alert("User blocked.");
-                                                                                } catch (e) {
-                                                                                    alert("Failed to block.");
-                                                                                }
-                                                                            }
-                                                                        });
-                                                                    }}
-                                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                                                    title="Block Account"
-                                                                >
-                                                                    <Shield className="w-4 h-4" />
-                                                                </button>
-
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        const confirmEmail = prompt(`Type "${u.email}" to confirm PERMANENT DELETION:`);
-                                                                        if (confirmEmail !== u.email) return;
-
-                                                                        try {
-                                                                            await fetch('/api/admin/users', {
-                                                                                method: 'DELETE',
-                                                                                headers: { 'Content-Type': 'application/json' },
-                                                                                body: JSON.stringify({ userId: u.id })
-                                                                            });
-                                                                            alert("User permanently deleted.");
-                                                                            fetchData();
-                                                                        } catch (e: any) {
-                                                                            alert("Deletion failed: " + e.message);
-                                                                        }
-                                                                    }}
-                                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                                    title="Delete Permanently"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                        </tbody>
-                                    </table>
                                 </div>
                             </motion.div>
-                        )
-                    }
-                </AnimatePresence >
-
-                {/* Credit Management Modal */}
-                <AnimatePresence>
-                    {
-                        selectedUserForCredits && (
-                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                    className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
-                                >
-                                    <div className="p-8 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                                        <div className="space-y-1">
-                                            <h2 className="text-lg font-bold text-slate-900 uppercase tracking-tighter">Adjust Wallet</h2>
-                                            <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">{selectedUserForCredits.full_name}</p>
-                                        </div>
-                                        <button onClick={() => setSelectedUserForCredits(null)} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
-                                            <X className="w-5 h-5 text-slate-400" />
-                                        </button>
-                                    </div>
-
-                                    <div className="p-8 space-y-6">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Credits Balance</label>
-                                            <div className="relative">
-                                                <Coins className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-amber-500" />
-                                                <input
-                                                    type="number"
-                                                    value={newCreditBalance}
-                                                    onChange={(e) => setNewCreditBalance(Number(e.target.value))}
-                                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-xl font-bold text-slate-900 focus:border-indigo-600 transition-all outline-none"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="flex gap-4">
-                                            <button
-                                                onClick={() => setSelectedUserForCredits(null)}
-                                                className="flex-1 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={handleUpdateCredits}
-                                                disabled={updatingCredits}
-                                                className="flex-[2] bg-slate-900 hover:bg-indigo-600 text-white py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-50"
-                                            >
-                                                {updatingCredits ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                                                Save Changes
-                                            </button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        )
-                    }
-                </AnimatePresence >
-
-                {/* Review Modal */}
-                <AnimatePresence>
-                    {
-                        selectedReview && (
-                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                    className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-                                >
-                                    <div className="p-8 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                                        <div className="space-y-1">
-                                            <h2 className="text-xl font-bold text-slate-900 uppercase tracking-tighter">Review & Polish Report</h2>
-                                            <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Client: {selectedReview.users?.full_name}</p>
-                                        </div>
-                                        <button onClick={() => setSelectedReview(null)} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
-                                            <X className="w-5 h-5 text-slate-400" />
-                                        </button>
-                                    </div>
-
-                                    <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                                        <div className="grid grid-cols-2 gap-8">
-                                            <div className="space-y-2">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <MessageSquare className="w-3.5 h-3.5" /> Seeker's Inquiry
-                                                </p>
-                                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-sm italic text-slate-600 font-medium">
-                                                    "{selectedReview.comments}"
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <Briefcase className="w-3.5 h-3.5" /> Focus Areas
-                                                </p>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {selectedReview.categories.map((cat: string) => (
-                                                        <span key={cat} className="px-3 py-1 bg-white border border-slate-200 rounded-full text-[10px] font-bold text-slate-500 uppercase tracking-widest">{cat}</span>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-[10px] font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                                                    <Activity className="w-3.5 h-3.5 text-indigo-600" /> Consultant's Analysis (Refine below)
-                                                </p>
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{reviewContent.length} chars</span>
-                                            </div>
-                                            <textarea
-                                                value={reviewContent}
-                                                onChange={(e) => setReviewContent(e.target.value)}
-                                                className="w-full min-h-[300px] bg-slate-50 border border-slate-200 rounded-[2rem] p-8 text-base font-medium focus:ring-8 focus:ring-indigo-500/5 focus:border-indigo-600 transition-all outline-none resize-none shadow-inner"
-                                                placeholder="Polish the astrologer's report here..."
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="p-8 border-t border-slate-100 bg-white flex items-center justify-between">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Final Validation Protocol</p>
-                                        <div className="flex gap-4">
-                                            <button
-                                                onClick={() => setSelectedReview(null)}
-                                                className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={handlePublish}
-                                                disabled={publishing || !reviewContent}
-                                                className="bg-slate-900 hover:bg-indigo-600 text-white px-8 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-xl flex items-center gap-2 disabled:opacity-50"
-                                            >
-                                                {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                                                Authorize & Publish Report
-                                            </button>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        )
-                    }
-                </AnimatePresence >
-            </div >
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
 
             <ConfirmationModal
                 isOpen={confirmationState.isOpen}
@@ -1296,7 +742,73 @@ export default function AdminDashboard() {
                 isDestructive={confirmationState.isDestructive}
                 confirmText={confirmationState.confirmText}
             />
-        </main >
+
+            {/* Reusing existing Modals (Credit, Review) logic wrapper if needed, or keeping them simple inline */}
+            <AnimatePresence>
+                {selectedUserForCredits && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+                        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4">
+                            <h3 className="text-sm font-bold text-slate-900 uppercase">Adjust Credits</h3>
+                            <input type="number" value={newCreditBalance} onChange={e => setNewCreditBalance(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-lg font-bold" />
+                            <div className="flex gap-2">
+                                <button onClick={() => setSelectedUserForCredits(null)} className="flex-1 py-2 text-xs font-bold text-slate-400">Cancel</button>
+                                <button onClick={handleUpdateCredits} className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold uppercase">Save</button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Review Modal (Simplified inline for cleaner code, preserving logic) */}
+            <AnimatePresence>
+                {selectedReview && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+                        <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+                            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                                <h3 className="text-sm font-bold text-slate-900 uppercase">Review Consultation</h3>
+                                <button onClick={() => setSelectedReview(null)}><X className="w-5 h-5 text-slate-400" /></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto space-y-4">
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm italic text-slate-600">"{selectedReview.comments}"</div>
+                                <textarea value={reviewContent} onChange={e => setReviewContent(e.target.value)} className="w-full h-40 bg-white border border-slate-200 rounded-xl p-4 text-sm focus:border-indigo-600 outline-none resize-none" placeholder="Write report..." />
+                            </div>
+                            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                                <button onClick={handlePublish} className="px-6 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold uppercase tracking-widest">Publish Report</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Logs Modal */}
+            <AnimatePresence>
+                {selectedLog && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+                        <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+                            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                                <h3 className="text-sm font-bold text-slate-900 uppercase">Log Details</h3>
+                                <button onClick={() => setSelectedLog(null)}><X className="w-5 h-5 text-slate-400" /></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto space-y-4 font-mono text-xs">
+                                <div className="space-y-2">
+                                    <span className="font-bold text-indigo-600 text-xs">USER</span>
+                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm">{selectedLog.user_message}</div>
+                                </div>
+                                <div className="space-y-2">
+                                    <span className="font-bold text-emerald-600 text-xs">AI</span>
+                                    <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100 text-sm whitespace-pre-wrap">{selectedLog.ai_response}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="font-bold text-slate-400">CONTEXT</span>
+                                    <div className="bg-slate-900 p-3 rounded-lg text-amber-500 overflow-x-auto">{selectedLog.context_snapshot}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+        </main>
     );
 }
 

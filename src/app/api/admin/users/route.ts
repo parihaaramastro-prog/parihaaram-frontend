@@ -24,8 +24,18 @@ const supabaseAdmin = getSupabaseAdmin();
 export async function GET(req: NextRequest) {
     try {
         if (!supabaseAdmin) throw new Error("MISSING_ENV: SUPABASE_SERVICE_ROLE_KEY");
-        const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+        const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
         if (error) throw error;
+
+        // Fetch all credits
+        const { data: creditsData, error: creditError } = await supabaseAdmin
+            .from('user_credits')
+            .select('user_id, credits');
+
+        if (creditError) throw creditError;
+
+        const creditMap = new Map();
+        creditsData?.forEach((c: any) => creditMap.set(c.user_id, c.credits));
 
         // Map auth users to a friendly format
         const mappedUsers = users.map(u => ({
@@ -35,7 +45,8 @@ export async function GET(req: NextRequest) {
             full_name: u.user_metadata?.full_name || u.user_metadata?.name || 'User',
             created_at: u.created_at,
             last_sign_in: u.last_sign_in_at,
-            provider: u.app_metadata?.provider || 'email'
+            provider: u.app_metadata?.provider || 'email',
+            credits: creditMap.get(u.id) || 0
         }));
 
         return NextResponse.json({ users: mappedUsers });

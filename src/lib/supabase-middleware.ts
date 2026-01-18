@@ -30,7 +30,21 @@ export async function updateSession(request: NextRequest) {
     )
 
     // refreshing the auth token
-    await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Protected Routes Logic
+    const protectedPaths = ['/dashboard', '/chat', '/consultation'];
+    const path = request.nextUrl.pathname;
+
+    const isProtected = protectedPaths.some(p => path.startsWith(p));
+
+    if (isProtected && !user) {
+        // Redirect to home if not logged in
+        // Appending ?login=true could be used to auto-open modal if implemented on FE
+        const url = request.nextUrl.clone();
+        url.pathname = '/';
+        return NextResponse.redirect(url);
+    }
 
     return supabaseResponse
 }

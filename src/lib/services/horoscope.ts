@@ -12,6 +12,8 @@ export interface SavedHoroscope {
     created_at: string;
 }
 
+let profileCache: SavedHoroscope[] | null = null;
+
 export const horoscopeService = {
     async saveHoroscope(data: Omit<SavedHoroscope, 'id' | 'created_at'>) {
         const supabase = createClient();
@@ -33,9 +35,12 @@ export const horoscopeService = {
             });
 
         if (error) throw error;
+        profileCache = null; // Invalidate cache
     },
 
-    async getSavedHoroscopes() {
+    async getSavedHoroscopes(forceRefresh = false) {
+        if (profileCache && !forceRefresh) return profileCache;
+
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -47,7 +52,8 @@ export const horoscopeService = {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return data as SavedHoroscope[];
+        profileCache = data as SavedHoroscope[];
+        return profileCache;
     },
 
     async deleteHoroscope(id: string) {
@@ -58,5 +64,12 @@ export const horoscopeService = {
             .eq('id', id);
 
         if (error) throw error;
+        if (profileCache) {
+            profileCache = profileCache.filter(p => p.id !== id);
+        }
+    },
+
+    clearCache() {
+        profileCache = null;
     }
 };

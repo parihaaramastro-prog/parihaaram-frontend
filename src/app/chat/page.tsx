@@ -425,7 +425,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
     if (!mounted) return null;
 
     return (
-        <main className="fixed inset-x-0 bottom-0 top-[70px] md:top-[110px] bg-slate-50 flex flex-col items-center z-0 md:px-4 h-[calc(100dvh-70px)] md:h-auto">
+        <main className="fixed inset-x-0 bottom-0 top-[120px] md:top-[140px] bg-slate-50 flex flex-col items-center z-0 md:px-4 h-[calc(100dvh-120px)] md:h-auto">
 
             <ProfileSelectionModal
                 isOpen={isModalOpen}
@@ -761,95 +761,147 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                     </header>
 
                     {/* Messages */}
-                    <div className={`flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-100 ${(credits !== null && credits <= 0) ? 'blur-sm select-none pointer-events-none' : ''}`}>
-                        {/* We use visibleMessages here instead of currentMessages to respect isHidden */}
-                        {visibleMessages.length === 0 ? (
-                            <div className="h-full flex flex-col justify-center items-center pb-20 text-center max-w-lg mx-auto px-4">
-                                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 sm:mb-8">
-                                    <Bot className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-600" />
-                                </div>
-                                <h1 className="text-3xl sm:text-4xl md:text-5xl font-medium text-slate-900 tracking-tight leading-tight mb-4">
-                                    How can <span className="text-indigo-600">stars</span><br />guide you today?
-                                </h1>
-                                <p className="text-slate-500 text-sm sm:text-base mb-8">
-                                    Start by selecting a profile to get personalized insights based on Lagna, Dasha, and more.
-                                </p>
+                    {/* Messages Area - Secure Rendering */}
+                    <div className={`flex-1 px-4 sm:px-8 py-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-100 relative ${credits !== null && credits <= 0 ? 'overflow-hidden' : 'overflow-y-auto'}`}>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-                                    {presets.map((p, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => p.action ? p.action() : handleSend(p.query)}
-                                            className="flex items-center gap-3 p-4 bg-white border border-slate-200 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-100/50 rounded-xl text-left transition-all group"
-                                        >
-                                            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                {p.icon}
-                                            </div>
-                                            <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-900">{p.label}</span>
-                                        </button>
+                        {/* LOADING STATE */}
+                        {credits === null && (
+                            <div className="h-full flex items-center justify-center">
+                                <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                            </div>
+                        )}
+
+                        {/* BLOCKED/NO CREDITS STATE - Securely Hidden Data */}
+                        {credits !== null && credits <= 0 && (
+                            <>
+                                {/* Fake Blurred Content (Security: Real data not rendered) */}
+                                <div className="blur-md select-none pointer-events-none opacity-40 space-y-8" aria-hidden="true">
+                                    {[1, 2, 3, 4].map((i) => (
+                                        <div key={i} className={`flex gap-4 max-w-2xl ${i % 2 === 0 ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}>
+                                            <div className="w-8 h-8 rounded-full bg-slate-200 shrink-0" />
+                                            <div className={`p-5 rounded-3xl w-full h-32 ${i % 2 === 0 ? 'bg-indigo-600' : 'bg-white border border-slate-100'}`} />
+                                        </div>
                                     ))}
                                 </div>
-                            </div>
-                        ) : (
-                            visibleMessages.map((msg, i) => (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    key={i}
-                                    className={`flex gap-3 sm:gap-4 max-w-[90%] sm:max-w-2xl ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
-                                >
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 ${msg.role === 'ai' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-600'}`}>
-                                        {msg.role === 'ai' ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                                    </div>
 
-                                    <div className="flex flex-col gap-2">
-                                        <div
-                                            className={`p-4 sm:p-5 rounded-3xl text-sm sm:text-[15px] leading-relaxed shadow-sm ${msg.role === 'user'
-                                                ? 'bg-indigo-600 text-white rounded-tr-sm'
-                                                : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm shadow-md'
-                                                }`}
-                                        >
-                                            <ReactMarkdown
-                                                components={{
-                                                    strong: ({ node, ...props }) => <span className="font-bold" {...props} />,
-                                                    ul: ({ node, ...props }) => <ul className="list-disc list-outside ml-4 space-y-1" {...props} />,
-                                                    ol: ({ node, ...props }) => <ol className="list-decimal list-outside ml-4 space-y-1" {...props} />,
-                                                    p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />
-                                                }}
-                                            >
-                                                {msg.content}
-                                            </ReactMarkdown>
+                                {/* Persistent Overlay */}
+                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center">
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="bg-white/90 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 text-center max-w-sm mx-4 ring-1 ring-black/5"
+                                    >
+                                        <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500">
+                                            <Coins className="w-8 h-8" />
                                         </div>
+                                        <h3 className="text-xl font-bold text-slate-900 mb-2">Out of Credits</h3>
+                                        <p className="text-slate-600 mb-6 text-sm leading-relaxed">
+                                            Your session has ended. To reveal the chat history and continue asking questions, please top up your credits.
+                                        </p>
+                                        <button
+                                            onClick={() => setShowPayModal(true)}
+                                            className="w-full py-3.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-slate-900/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                        >
+                                            Recharge to Unlock
+                                        </button>
+                                    </motion.div>
+                                </div>
+                            </>
+                        )}
 
-                                        {/* In-Chat Actions */}
-                                        {msg.role === 'ai' && shouldShowProfileButton(msg.content) && (
-                                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2">
+                        {/* ACTIVE STATE - Real Data */}
+                        {credits !== null && credits > 0 && (
+                            <>
+                                {visibleMessages.length === 0 ? (
+                                    <div className="h-full flex flex-col justify-center items-center pb-20 text-center max-w-lg mx-auto px-4">
+                                        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 sm:mb-8">
+                                            <Bot className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-600" />
+                                        </div>
+                                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-medium text-slate-900 tracking-tight leading-tight mb-4">
+                                            How can <span className="text-indigo-600">stars</span><br />guide you today?
+                                        </h1>
+                                        <p className="text-slate-500 text-sm sm:text-base mb-8">
+                                            Start by selecting a profile to get personalized insights based on Lagna, Dasha, and more.
+                                        </p>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                                            {presets.map((p, i) => (
                                                 <button
-                                                    onClick={() => openProfileSelector(shouldShowPartnerButton(msg.content) ? 'secondary' : 'primary')}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-indigo-200"
+                                                    key={i}
+                                                    onClick={() => p.action ? p.action() : handleSend(p.query)}
+                                                    className="flex items-center gap-3 p-4 bg-white border border-slate-200 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-100/50 rounded-xl text-left transition-all group"
                                                 >
-                                                    <User className="w-4 h-4" />
-                                                    {shouldShowPartnerButton(msg.content) ? "Select Partner" : "Select Profile"}
+                                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                        {p.icon}
+                                                    </div>
+                                                    <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-900">{p.label}</span>
                                                 </button>
-                                            </motion.div>
-                                        )}
+                                            ))}
+                                        </div>
                                     </div>
-                                </motion.div>
-                            ))
+                                ) : (
+                                    visibleMessages.map((msg, i) => (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            key={i}
+                                            className={`flex gap-3 sm:gap-4 max-w-[90%] sm:max-w-2xl ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
+                                        >
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 ${msg.role === 'ai' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-600'}`}>
+                                                {msg.role === 'ai' ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                                            </div>
+
+                                            <div className="flex flex-col gap-2">
+                                                <div
+                                                    className={`p-4 sm:p-5 rounded-3xl text-sm sm:text-[15px] leading-relaxed shadow-sm ${msg.role === 'user'
+                                                        ? 'bg-indigo-600 text-white rounded-tr-sm'
+                                                        : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm shadow-md'
+                                                        }`}
+                                                >
+                                                    <ReactMarkdown
+                                                        components={{
+                                                            strong: ({ node, ...props }) => <span className="font-bold" {...props} />,
+                                                            ul: ({ node, ...props }) => <ul className="list-disc list-outside ml-4 space-y-1" {...props} />,
+                                                            ol: ({ node, ...props }) => <ol className="list-decimal list-outside ml-4 space-y-1" {...props} />,
+                                                            p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />
+                                                        }}
+                                                    >
+                                                        {msg.content}
+                                                    </ReactMarkdown>
+                                                </div>
+
+                                                {/* In-Chat Actions */}
+                                                {msg.role === 'ai' && shouldShowProfileButton(msg.content) && (
+                                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2">
+                                                        <button
+                                                            onClick={() => openProfileSelector(shouldShowPartnerButton(msg.content) ? 'secondary' : 'primary')}
+                                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-indigo-200"
+                                                        >
+                                                            <User className="w-4 h-4" />
+                                                            {shouldShowPartnerButton(msg.content) ? "Select Partner" : "Select Profile"}
+                                                        </button>
+                                                    </motion.div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    ))
+                                )}
+
+                                {isTyping && (
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-4 max-w-3xl mr-auto">
+                                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mt-1">
+                                            <Bot className="w-4 h-4" />
+                                        </div>
+                                        <div className="bg-white border border-slate-100 p-4 rounded-3xl rounded-tl-sm shadow-md flex gap-1">
+                                            <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
+                                            <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce delay-100" />
+                                            <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce delay-200" />
+                                        </div>
+                                    </motion.div>
+                                )}
+                                <div ref={messagesEndRef} />
+                            </>
                         )}
-                        {isTyping && (
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-4 max-w-3xl mr-auto">
-                                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mt-1">
-                                    <Bot className="w-4 h-4" />
-                                </div>
-                                <div className="bg-white border border-slate-100 p-4 rounded-3xl rounded-tl-sm shadow-md flex gap-1">
-                                    <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
-                                    <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce delay-100" />
-                                    <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce delay-200" />
-                                </div>
-                            </motion.div>
-                        )}
-                        <div ref={messagesEndRef} />
                     </div>
 
                     {/* Input Area */}
