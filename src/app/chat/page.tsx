@@ -18,6 +18,7 @@ import { loadRazorpay } from "@/lib/loadRazorpay";
 import ProfileSelectionModal from "@/components/ProfileSelectionModal";
 import ReactMarkdown from 'react-markdown';
 import { chatService, ChatSession, ChatMessage } from "@/lib/services/chat";
+import Footer from "@/components/Footer";
 
 function ChatContent() {
     const router = useRouter();
@@ -837,6 +838,11 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                         </div>
                                     </motion.div>
                                 )}
+
+                                <div className="pt-20 pb-4">
+                                    <Footer />
+                                </div>
+
                                 <div ref={messagesEndRef} />
                             </>
                         )}

@@ -327,25 +327,7 @@ function HomeContent() {
                                 </div>
                             </section>
 
-                            <footer className="text-center space-y-12 pb-12 w-full max-w-2xl mx-auto">
-                                <div className="w-12 h-[1px] bg-slate-300 mx-auto" />
 
-                                <div className="pt-8 flex justify-center">
-                                    <Link href="/astrologer/login" className="text-[10px] uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors font-bold">
-                                        Astrologer Login
-                                    </Link>
-                                </div>
-
-                                <div className="space-y-4 opacity-50 pt-8">
-                                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
-                                        {lang === 'ta' ? 'நம்பிக்கை • துல்லியம் • வழிகாட்டுதல்' : 'Trust • Accuracy • Guidance'}
-                                    </p>
-                                    <div className="flex justify-center gap-6 pt-2">
-                                        <Link href="/terms" className="text-[10px] text-slate-400 hover:text-indigo-600 font-medium transition-colors">Terms</Link>
-                                        <Link href="/privacy" className="text-[10px] text-slate-400 hover:text-indigo-600 font-medium transition-colors">Privacy</Link>
-                                    </div>
-                                </div>
-                            </footer>
                         </div>
                     )}
                 </div>

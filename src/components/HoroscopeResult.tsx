@@ -352,9 +352,17 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Vimshottari Dasha</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {results.mahadashas.map((m, i) => (
-                            <MahadashaNode key={m.planet + i} m={m} language={language} />
-                        ))}
+                        {results.mahadashas
+                            .filter(m => {
+                                // Limit to next 20 years
+                                const currentYear = new Date().getFullYear();
+                                const limitYear = currentYear + 20;
+                                const startYear = parseInt(m.start_date.split('-')[2]);
+                                return startYear <= limitYear;
+                            })
+                            .map((m, i) => (
+                                <MahadashaNode key={m.planet + i} m={m} language={language} />
+                            ))}
                     </div>
                 </div>
 

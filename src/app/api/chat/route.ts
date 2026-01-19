@@ -283,6 +283,21 @@ Otherwise, answer the user's question directly based on the provided context.`;
                     return `- ${p.name}: ${signName} at ${deg}° (House ${wsHouse > 0 ? wsHouse : p.house + ' [Source]'} - Whole Sign)`;
                 }).join('\n');
 
+                // --- NEW: Full Dasha Timeline (Limited to 20 years into future) ---
+                const dashaTimeline = c.mahadashas?.filter((m: any) => {
+                    // Check if data has start_date (it should, based on usage elsewhere)
+                    // If not, fallback to using end_date of previous or just include all.
+                    // But assuming structure is consistent with frontend:
+                    if (!m.start_date) return true;
+                    const currentYear = new Date().getFullYear();
+                    const limitYear = currentYear + 20;
+                    const startYear = parseInt(m.start_date.split('-')[2]);
+                    return startYear <= limitYear;
+                }).map((m: any) => {
+                    const isCurrent = m.is_current ? " (CURRENT)" : "";
+                    return `- ${m.planet} Mahadasha: ${m.start_date} to ${m.end_date}${isCurrent}`;
+                }).join('\n');
+
                 systemPrompt += `\n\nActive Profile Context:
 Name: ${primaryProfile.name}
 Birth Details: ${primaryProfile.dob} at ${primaryProfile.tob} in ${primaryProfile.pob}
@@ -296,11 +311,14 @@ IMPORTANT REFERENCE: In this chart, ${c.lagna?.name} is the 1st House. Calculati
 Rasi (Moon Sign): ${c.moon_sign?.name}
 Nakshatra: ${c.nakshatra?.name}
 
---- TIMING & DASA ---
+--- TIMING & DASHA TIMELINE (Past, Present & Future) ---
 Birth Dasha: ${birthDashaStr}
-Birth Bhukti: ${birthBhuktiStr}
-Current Dasha: ${dasha?.planet || 'Unk'} (Ends: ${dasha?.end_date})
-Current Bhukti: ${bhukti?.planet || 'Unk'} (Ends: ${bhukti?.end_date})
+Current Phase: ${dasha?.planet || 'Unk'} / ${bhukti?.planet || 'Unk'}
+
+Full Mahadasha Sequence:
+${dashaTimeline}
+
+Note: Use this timeline to verify if the user has passed through a specific period (e.g. Chandra/Moon Dasha) in the past.
 ---------------------
 
 Planetary Positions (Calculated Whole Sign Houses relative to ${c.lagna?.name}):
