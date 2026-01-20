@@ -161,21 +161,77 @@ function ChatContent() {
         fetchSession();
     }, [currentChatId, userId, savedProfiles]); // Re-run if profiles load late
 
-    // Auto-Start Check (New User from Landing)
+    // Auto-Start Check (New User from Landing / VibeCheck)
     useEffect(() => {
-        const isNewUser = searchParams.get('new') === 'true';
-        if (isNewUser && userId && savedProfiles.length > 0) {
-            // Find latest profile and start chat
-            // Avoid double creation
+        const mode = searchParams.get('new');
+
+        if (mode === 'vibecheck' && userId && savedProfiles.length >= 2) {
+            // Vibe Check Flow: Latest 2 profiles (Partner is usually latest [0], You are [1] or vice-versa depending on save order)
+            // VibeCheck saves P1 (You) first, then P2 (Partner).
+            // So P2 (Partner) should be at index 0 (Newest), P1 (You) at index 1.
+            const partner = savedProfiles[0];
+            const you = savedProfiles[1];
+
+            const hasRecentSession = chats.length > 0 && chats[0].title.includes("Compatibility") && (new Date().getTime() - new Date(chats[0].updated_at).getTime() < 10000);
+
+            if (!hasRecentSession) {
+                createVibeCheckSession(you, partner);
+                router.replace('/chat');
+            }
+
+        } else if (mode === 'true' && userId && savedProfiles.length > 0) {
+            // Standard Flow
             const hasRecentEmptyChat = chats.length > 0 && chats[0].title === "New Session" && (new Date().getTime() - new Date(chats[0].created_at).getTime() < 10000);
             if (!hasRecentEmptyChat) {
                 const latest = savedProfiles[0];
-                // Create new chat with this profile
                 createNewChatWithProfile(latest);
                 router.replace('/chat');
             }
         }
     }, [searchParams, userId, savedProfiles]);
+
+    const createVibeCheckSession = async (p1: SavedHoroscope, p2: SavedHoroscope) => {
+        if (!userId) return;
+        try {
+            const newSession = await chatService.createSession(userId, `Compatibility: ${p1.name} & ${p2.name}`, p1.id);
+            // Update secondary profile immediately
+            await chatService.updateSessionProfiles(newSession.id, undefined, p2.id);
+
+            setChats(prev => [newSession, ...prev]);
+            setCurrentChatId(newSession.id);
+            setPrimaryProfile(p1);
+            setSecondaryProfile(p2);
+
+            // Add Greeting & Trigger Analysis
+            await chatService.addMessage(newSession.id, 'ai', `Hello! I see you want to analyze the compatibility between **${p1.name}** and **${p2.name}**. I have their birth charts ready.`);
+
+            // Auto-trigger the prompt
+            setTimeout(() => {
+                const prompt = `Analyze the detailed compatibility between ${p1.name} and ${p2.name}.
+
+**Profile 1 (${p1.name}):**
+DOB: ${p1.dob}
+Time: ${p1.tob}
+Place: ${p1.pob}
+
+**Profile 2 (${p2.name}):**
+DOB: ${p2.dob}
+Time: ${p2.tob}
+Place: ${p2.pob}
+
+Focus on:
+1. Dasha Sandhi (Timeline overlaps)
+2. Ego Conflicts (Sun/Moon positions)
+3. Long-term Stability
+4. Any "Karmic Debt" indicated by Saturn/Rahu.`;
+
+                handleSend(prompt, true, { p1, p2 }, newSession.id);
+            }, 500);
+
+        } catch (e) {
+            console.error(e);
+        }
+    };
 
     const createNewChatWithProfile = async (profile: SavedHoroscope) => {
         if (!userId) return;
@@ -839,9 +895,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                     </motion.div>
                                 )}
 
-                                <div className="pt-20 pb-4">
-                                    <Footer />
-                                </div>
+
 
                                 <div ref={messagesEndRef} />
                             </>

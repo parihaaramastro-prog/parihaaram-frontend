@@ -6,8 +6,8 @@ import Footer from "./Footer";
 export default function FooterWrapper() {
     const pathname = usePathname();
 
-    // Don't show global footer on chat page (we'll place it manually inside the scroll area)
-    if (pathname === '/chat') {
+    // Don't show global footer on chat or dashboard key routes
+    if (pathname.startsWith('/chat') || pathname.startsWith('/dashboard')) {
         return null;
     }
 

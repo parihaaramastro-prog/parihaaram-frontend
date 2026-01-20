@@ -13,9 +13,53 @@ const openai = new OpenAI({
 // Initialize Gemini client
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+// Helper: Calculate Chart Data on the fly if missing
+async function calculateChartData(dob: string, tob: string, lat: number, lon: number) {
+    try {
+        const [year, month, day] = dob.split("-").map(Number);
+        const [hour, minute] = tob.split(":").map(Number);
+
+        const inputAsUtcMs = Date.UTC(year, month - 1, day, hour, minute);
+        const istOffsetMs = 5.5 * 60 * 60 * 1000;
+        const trueUtcMs = inputAsUtcMs - istOffsetMs;
+        const utcDate = new Date(trueUtcMs);
+
+        const payload = {
+            year: utcDate.getUTCFullYear(),
+            month: utcDate.getUTCMonth() + 1,
+            day: utcDate.getUTCDate(),
+            hour: utcDate.getUTCHours(),
+            minute: utcDate.getUTCMinutes(),
+            lat: lat,
+            lon: lon
+        };
+
+        const apiUrl = process.env.ASTRO_API_URL || "http://127.0.0.1:8000";
+        console.log(`[Chat API] Connecting to Astro Engine at: ${apiUrl}`);
+
+        const apiResponse = await fetch(`${apiUrl}/calculate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        if (!apiResponse.ok) {
+            console.error(`[Chat API] Astro Engine Error: ${apiResponse.status}`);
+            return null;
+        }
+        return await apiResponse.json();
+    } catch (e) {
+        console.error("On-the-fly calculation failed:", e);
+        return null;
+    }
+}
+
 export async function POST(req: NextRequest) {
     try {
         const cookieStore = await cookies();
+
+        // ... (rest of auth/settings logic)
+
 
         // Initialize Supabase Server Client
         const supabase = createServerClient(
@@ -75,6 +119,17 @@ export async function POST(req: NextRequest) {
 
         const body = await req.json();
         const { messages, context } = body;
+
+        console.log("-----------------------------------------");
+        console.log("[Chat API] Request Body Context Check:");
+        if (context) {
+            const { primaryProfile, secondaryProfile } = context;
+            console.log("Primary:", primaryProfile?.name, "ChartData:", !!primaryProfile?.chart_data);
+            console.log("Secondary:", secondaryProfile?.name, "ChartData:", !!secondaryProfile?.chart_data);
+        } else {
+            console.log("CONTEXT IS MISSING OR NULL");
+        }
+        console.log("-----------------------------------------");
 
         // Construct System Prompt
         const currentDate = new Date().toDateString();
@@ -213,6 +268,26 @@ Otherwise, answer the user's question directly based on the provided context.`;
         if (context) {
             const { primaryProfile, secondaryProfile } = context;
 
+            // FALLBACK: If chart_data is missing, calculate it now
+            if (primaryProfile && !primaryProfile.chart_data) {
+                console.log(`[Chat API] Missing chart_data for primary (${primaryProfile.name}). Calculating...`);
+                primaryProfile.chart_data = await calculateChartData(
+                    primaryProfile.dob,
+                    primaryProfile.tob,
+                    primaryProfile.lat || 13.0827,
+                    primaryProfile.lon || 80.2707
+                );
+            }
+            if (secondaryProfile && !secondaryProfile.chart_data) {
+                console.log(`[Chat API] Missing chart_data for secondary (${secondaryProfile.name}). Calculating...`);
+                secondaryProfile.chart_data = await calculateChartData(
+                    secondaryProfile.dob,
+                    secondaryProfile.tob,
+                    secondaryProfile.lat || 13.0827,
+                    secondaryProfile.lon || 80.2707
+                );
+            }
+
             if (primaryProfile && primaryProfile.chart_data) {
                 const c = primaryProfile.chart_data;
                 const dasha = c.mahadashas?.find((m: any) => m.is_current);
@@ -318,9 +393,6 @@ Current Phase: ${dasha?.planet || 'Unk'} / ${bhukti?.planet || 'Unk'}
 Full Mahadasha Sequence:
 ${dashaTimeline}
 
-Note: Use this timeline to verify if the user has passed through a specific period (e.g. Chandra/Moon Dasha) in the past.
----------------------
-
 Planetary Positions (Calculated Whole Sign Houses relative to ${c.lagna?.name}):
 ${planetsContext}
 
@@ -329,15 +401,29 @@ IMPORTANT: TRUST the 'House' column above. It is pre-calculated using strict WHO
 - Next Sign = House 2, etc.
 - Ignore any conflicting house information from your own training if it contradicts the list above.
 `;
+            } else if (primaryProfile) {
+                // FALLBACK: Raw Input Context
+                systemPrompt += `\n\nActive Profile Context (Calculation Unavailable):
+Name: ${primaryProfile.name}
+Birth Details: ${primaryProfile.dob} at ${primaryProfile.tob} in ${primaryProfile.pob}
+Note: Precise planetary positions are currently unavailable. Answer based on general astrological principles for this birth date or ask the user for clarification if critical.
+`;
             }
 
             if (secondaryProfile && secondaryProfile.chart_data) {
                 const c2 = secondaryProfile.chart_data;
                 systemPrompt += `\n\nComparison Profile (Partner/Other):
 Name: ${secondaryProfile.name}
+Birth Details: ${secondaryProfile.dob} at ${secondaryProfile.tob || '12:00'} in ${secondaryProfile.pob || 'Unknown'}
 Lagna: ${c2.lagna?.name}
 Rasi: ${c2.moon_sign?.name}
 Nakshatra: ${c2.nakshatra?.name}
+`;
+            } else if (secondaryProfile) {
+                systemPrompt += `\n\nComparison Profile (Partner/Other):
+Name: ${secondaryProfile.name}
+Birth Details: ${secondaryProfile.dob} at ${secondaryProfile.tob || '12:00'} in ${secondaryProfile.pob || 'Unknown'}
+Note: Precise chart data unavailable.
 `;
             }
         }

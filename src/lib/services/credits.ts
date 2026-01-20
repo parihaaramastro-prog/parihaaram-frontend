@@ -22,7 +22,7 @@ export const creditService = {
             // Row not found, create one with default (trial) credits
             const { data: newData, error: createError } = await supabase
                 .from('user_credits')
-                .insert({ user_id: user.id, credits: 3 }) // Give 3 free messages
+                .insert({ user_id: user.id, credits: 2 }) // Give 2 free messages
                 .select()
                 .single();
 

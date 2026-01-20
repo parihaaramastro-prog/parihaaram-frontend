@@ -81,7 +81,7 @@ export default function AuthModal({ isOpen, onClose, customTitle, customDescript
                                         type="button"
                                         onClick={() => supabase.auth.signInWithOAuth({
                                             provider: 'google',
-                                            options: { redirectTo: `${window.location.origin}/auth/callback` },
+                                            options: { redirectTo: `${window.location.origin}/auth/callback?next=${window.location.pathname}` },
                                         })}
                                         className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm tracking-wide transition-all shadow-sm flex items-center justify-center gap-2 sm:gap-3 active:scale-95"
                                     >

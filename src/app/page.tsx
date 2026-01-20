@@ -11,6 +11,7 @@ import {
     Shield, Briefcase, Lock, Clock, Compass, Sparkles, ArrowRight
 } from "lucide-react";
 import AuthModal from "@/components/AuthModal";
+import VibeCheck from "@/components/VibeCheck";
 import { createClient } from "@/lib/supabase";
 import { AstrologyResults } from "@/lib/astrology";
 import { useRouter } from "next/navigation";
@@ -208,6 +209,39 @@ function HomeContent() {
 
                     {!results && (
                         <div className="w-full space-y-24">
+                            {/* Compatibility Lab Teaser */}
+                            <section className="max-w-[1400px] mx-auto px-6 pt-12">
+                                <Link href="/vibecheck" className="block group">
+                                    <div className="relative overflow-hidden bg-gradient-to-r from-pink-500 to-indigo-600 rounded-[3rem] p-1 shadow-2xl shadow-indigo-500/10">
+                                        <div className="bg-white rounded-[2.9rem] p-8 md:p-16 text-center space-y-6 relative overflow-hidden">
+                                            {/* Decor */}
+                                            <div className="absolute top-0 right-0 w-64 h-64 bg-pink-50 rounded-full blur-[80px] -z-10 group-hover:bg-pink-100 transition-colors" />
+                                            <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-50 rounded-full blur-[80px] -z-10 group-hover:bg-indigo-100 transition-colors" />
+
+                                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest">
+                                                <Sparkles className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                                                New Tool
+                                            </div>
+
+                                            <h2 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tighter">
+                                                Check Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-indigo-600">Vibe Score</span>
+                                            </h2>
+
+                                            <p className="text-slate-500 text-lg max-w-xl mx-auto leading-relaxed">
+                                                Decode your romantic chemistry with coordinate-based precision.
+                                                See if it's a Karmic Lesson or an Electric Connection.
+                                            </p>
+
+                                            <div className="pt-4">
+                                                <button className="inline-flex items-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-xl font-bold text-sm uppercase tracking-widest group-hover:scale-105 transition-transform">
+                                                    Launch Protocol <ArrowRight className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Link>
+                            </section>
+
                             {/* Features Section */}
                             <section id="features" className="max-w-[1400px] mx-auto px-6 pt-24">
                                 <div className="text-center space-y-4 mb-16">
