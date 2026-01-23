@@ -124,14 +124,14 @@ function HomeContent() {
             {/* Fixed Top Header - Show when user is logged in */}
 
 
-            <main className={`relative min-h-screen flex flex-col items-center ${results ? 'pt-32' : 'pt-16'} pb-40 px-4 overflow-x-hidden transition-all duration-700`}>
-                <div className={`w-full ${results ? 'max-w-[1600px]' : 'max-w-4xl'} flex flex-col items-center text-center transition-all duration-1000 ease-out font-sans`}>
+            <main className={`relative min-h-screen flex flex-col items-center ${results ? 'pt-32' : 'pt-16'} pb-40 px-8 md:px-12 overflow-x-hidden transition-all duration-700`}>
+                <div className={`w-full ${results ? 'max-w-[1600px] flex flex-col items-center' : 'max-w-[1400px] grid lg:grid-cols-2 gap-12 lg:gap-24 items-center text-left'} transition-all duration-1000 ease-out font-sans`}>
 
                     {!results && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="mb-12 space-y-6"
+                            className="mb-12 lg:mb-0 space-y-8"
                         >
                             <motion.div
                                 initial={{ opacity: 0, scale: 0.9 }}
@@ -148,7 +148,7 @@ function HomeContent() {
                                     {lang === 'ta' ? 'இங்கே கணிக்கவும்' : 'Destiny'}
                                 </span>
                             </h1>
-                            <p className="text-slate-600 text-xl font-medium max-w-xl mx-auto leading-relaxed">
+                            <p className="text-slate-600 text-xl font-medium leading-relaxed max-w-lg">
                                 {lang === 'ta'
                                     ? 'பரிகாரம்: இந்தியாவின் முதல் துல்லியமான ஜோதிட தளம்.'
                                     : 'Pariharam provides accurate birth charts and personalized insights based on authentic Vedic principles.'}
@@ -158,7 +158,7 @@ function HomeContent() {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.2 }}
-                                className="flex justify-center pt-2"
+                                className="pt-2"
                             >
                                 <Link href="/ai" className="group relative inline-flex items-center gap-3 bg-slate-900 text-white pl-5 pr-4 py-3 rounded-full hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-500/20 overflow-hidden">
                                     <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -184,7 +184,7 @@ function HomeContent() {
                                     initial={{ opacity: 0, scale: 0.98 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     exit={{ opacity: 0, scale: 1.02 }}
-                                    className="space-y-12"
+                                    className="w-full"
                                 >
                                     <HoroscopeForm onCalculate={handleCalculate} loading={loading} language={lang} initialData={lastInput} />
                                 </motion.div>

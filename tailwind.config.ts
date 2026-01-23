@@ -41,6 +41,7 @@ const config: Config = {
             fontFamily: {
                 tamil: ["var(--font-tamil)", "sans-serif"],
                 inter: ["var(--font-inter)", "sans-serif"],
+                serif: ["var(--font-serif)", "serif"],
             },
         },
     },

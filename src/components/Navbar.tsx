@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Compass, Sparkles, History, User, Bot,
-    Briefcase, ShieldCheck, Users, LogOut, Menu, X
+    Briefcase, ShieldCheck, Users, LogOut, Menu, X, BookOpen
 } from "lucide-react";
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -88,6 +88,7 @@ export default function Navbar() {
         guest: [
             { id: 'home', label: 'Home', icon: Compass, href: '/' },
             { id: 'features', label: 'Features', icon: Sparkles, href: '#features' },
+            { id: 'blog', label: 'Blog', icon: BookOpen, href: '/blog' },
             { id: 'trust', label: 'Trust', icon: ShieldCheck, href: '#trust' },
         ],
         admin: [
@@ -101,6 +102,7 @@ export default function Navbar() {
             { id: 'expertise', label: 'Consult', icon: Sparkles, href: '/consultation' },
             { id: 'history', label: 'Readings', icon: History, href: '/consultation/history' },
             { id: 'chat', label: 'AI Astrologer', icon: Bot, href: '/chat' },
+            { id: 'blog', label: 'Blog', icon: BookOpen, href: '/blog' },
         ],
     };
 
@@ -134,8 +136,8 @@ export default function Navbar() {
                         </div>
                     </Link>
 
-                    {/* Navigation */}
-                    <div className="hidden md:flex items-center gap-1 p-1.5 bg-slate-100/50 backdrop-blur-md rounded-2xl border border-slate-200/40">
+                    {/* Navigation - Centered Absolutely */}
+                    <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-1 p-1.5 bg-slate-100/50 backdrop-blur-md rounded-2xl border border-slate-200/40">
                         {currentLinks.map((link) => (
                             <Link
                                 key={link.id}
