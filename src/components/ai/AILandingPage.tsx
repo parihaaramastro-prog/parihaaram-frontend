@@ -149,7 +149,8 @@ export default function AIAstrologerLanding() {
                     tob: data.tob,
                     pob: data.pob,
                     lat: data.lat,
-                    lon: data.lon
+                    lon: data.lon,
+                    gender: 'male' // Default for landing page quick capture
                 });
             } catch (e) {
                 console.warn("Could not save horoscope entry:", e);
