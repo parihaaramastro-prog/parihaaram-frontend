@@ -11,7 +11,7 @@
     "@google/genai": "^1.35.0",
     "@ishubhamx/panchangam-js": "^1.0.3",
     "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.89.0",
+    "@supabase/supabase-js": "^2.91.1",
     "@tailwindcss/postcss": "^4.1.18",
     "astronomy-engine": "^2.1.19",
     "circular-natal-horoscope-js": "^1.1.0",
@@ -22,10 +22,12 @@
     "lucide-react": "^0.562.0",
     "next": "latest",
     "openai": "^6.15.0",
+    "posthog-js": "^1.335.2",
     "razorpay": "^2.9.6",
     "react": "latest",
     "react-dom": "latest",
     "react-markdown": "^10.1.0",
+    "recharts": "^3.7.0",
     "tailwind-merge": "latest"
   },
   "devDependencies": {

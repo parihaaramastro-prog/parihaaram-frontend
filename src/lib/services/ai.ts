@@ -42,6 +42,13 @@ export const aiService = {
                 throw new Error(errorData.error || `Server Error: ${response.status}`);
             }
 
+            if (typeof window !== 'undefined' && (window as any).posthog) {
+                (window as any).posthog.capture('ai_response_generated', {
+                    intent: context.intent,
+                    credits_remaining: data.remainingCredits
+                });
+            }
+
             return {
                 reply: data.reply,
                 remainingCredits: data.remainingCredits

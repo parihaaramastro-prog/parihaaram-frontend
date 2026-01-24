@@ -3,6 +3,7 @@ import { Inter, Cardo } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import FooterWrapper from "@/components/FooterWrapper";
+import { CSPostHogProvider } from "@/lib/providers/PostHogProvider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const serif = Cardo({ weight: ["400", "700"], subsets: ["latin"], variable: "--font-serif" });
@@ -88,15 +89,17 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
+        <html lang="en" suppressHydrationWarning>
             <body className={`${inter.variable} ${serif.variable} font-sans antialiased min-h-screen`}>
                 <JsonLd />
                 <div className="app-bg-mesh" />
-                <Navbar />
-                <main className="pt-32 md:pt-40 min-h-screen">
-                    {children}
-                </main>
-                <FooterWrapper />
+                <CSPostHogProvider>
+                    <Navbar />
+                    <main className="pt-24 md:pt-32 min-h-screen">
+                        {children}
+                    </main>
+                    <FooterWrapper />
+                </CSPostHogProvider>
             </body>
         </html>
     );

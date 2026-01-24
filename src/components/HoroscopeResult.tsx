@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
     Moon, Star, Sparkles, Map, Calendar, Info,
     ChevronRight, ChevronDown, Bookmark, Loader2, Check,
-    MessageSquare, History, Clock
+    MessageSquare, History, Clock, User
 } from "lucide-react";
 import {
     AstrologyResults, Mahadasha, NAKSHATRAS_TAMIL
@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase";
 interface HoroscopeResultProps {
     results: AstrologyResults;
     onReset: () => void;
-    inputData: { name?: string; dob: string; tob: string; pob: string; lat: number; lon: number };
+    inputData: { name?: string; dob: string; tob: string; pob: string; lat: number; lon: number; gender?: string };
     language?: 'en' | 'ta';
     onLanguageChange?: (lang: 'en' | 'ta') => void;
     variant?: 'dashboard' | 'public';
@@ -179,6 +179,7 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
             await horoscopeService.saveHoroscope({
                 name,
                 ...inputData,
+                gender: inputData.gender || 'male',
                 chart_data: results
             });
             setSaved(true);
@@ -239,6 +240,10 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                 </div>
 
                 <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-medium text-slate-500 pt-4">
+                    <span className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-slate-200">
+                        {inputData.gender === 'female' ? <User className="w-3.5 h-3.5 text-pink-500" /> : <User className="w-3.5 h-3.5 text-blue-500" />}
+                        <span className="capitalize">{inputData.gender || 'Unknown'}</span>
+                    </span>
                     <span className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-slate-200">
                         <Calendar className="w-3.5 h-3.5 text-indigo-500" />
                         {new Date(inputData.dob).toLocaleDateString(language === 'ta' ? 'ta-IN' : 'en-GB')}
@@ -401,7 +406,10 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
 
                 {user && (
                     <button
-                        onClick={() => handleSave()}
+                        onClick={() => {
+                            if ((window as any).posthog) (window as any).posthog.capture('report_archived', { name: inputData.name });
+                            handleSave();
+                        }}
                         disabled={saving || saved}
                         className={`flex items-center gap-2 px-8 py-3 rounded-full text-xs font-bold uppercase tracking-widest transition-all shadow-md ${saved ? 'bg-indigo-900 text-white' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
                     >

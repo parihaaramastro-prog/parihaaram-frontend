@@ -102,7 +102,7 @@ export default function Navbar() {
             { id: 'expertise', label: 'Consult', icon: Sparkles, href: '/consultation' },
             { id: 'history', label: 'Readings', icon: History, href: '/consultation/history' },
             { id: 'chat', label: 'AI Astrologer', icon: Bot, href: '/chat' },
-            { id: 'blog', label: 'Blog', icon: BookOpen, href: '/blog' },
+
         ],
     };
 

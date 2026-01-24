@@ -2,21 +2,25 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Calendar, Clock, MapPin, Sparkles, User, Loader2 } from "lucide-react";
+import { Calendar, Clock, MapPin, Sparkles, User, Loader2, Users } from "lucide-react";
 import DivineDatePicker from "@/components/ui/DivineDatePicker";
 import DivineTimePicker from "@/components/ui/DivineTimePicker";
 
 interface HoroscopeFormProps {
-    onCalculate: (data: { name: string; dob: string; tob: string; pob: string; lat?: number; lon?: number }) => void;
+    onCalculate: (data: { name: string; dob: string; tob: string; pob: string; lat?: number; lon?: number; gender: string }) => void;
     loading: boolean;
     language?: 'en' | 'ta';
-    initialData?: { name?: string; dob: string; tob: string; pob: string; lat?: number; lon?: number } | null;
+    initialData?: { name?: string; dob: string; tob: string; pob: string; lat?: number; lon?: number; gender?: string } | null;
 }
 
 const TRANSLATIONS = {
     en: {
         name: "Name",
         namePlaceholder: "Enter your full name",
+        gender: "Gender",
+        male: "Male",
+        female: "Female",
+        other: "Other",
         dob: "Date of Birth",
         tob: "Time of Birth",
         pob: "Place of Birth",
@@ -28,6 +32,10 @@ const TRANSLATIONS = {
     ta: {
         name: "பெயர்",
         namePlaceholder: "உங்கள் பெயர்",
+        gender: "பாலினம்",
+        male: "ஆண்",
+        female: "பெண்",
+        other: "மற்றவை",
         dob: "பிறந்த தேதி",
         tob: "பிறந்த நேரம்",
         pob: "பிறந்த இடம்",
@@ -41,6 +49,7 @@ const TRANSLATIONS = {
 export default function HoroscopeForm({ onCalculate, loading, language = 'en', initialData }: HoroscopeFormProps) {
     const [formData, setFormData] = useState({
         name: initialData?.name || "",
+        gender: initialData?.gender || "male",
         dob: initialData?.dob || "",
         tob: initialData?.tob || "",
         pob: initialData?.pob || "",
@@ -52,6 +61,7 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
         if (initialData) {
             setFormData({
                 name: initialData.name || "",
+                gender: initialData.gender || "male",
                 dob: initialData.dob || "",
                 tob: initialData.tob || "",
                 pob: initialData.pob || "",
@@ -152,6 +162,28 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                     </div>
                 </div>
 
+                <div className="w-full">
+                    <label className="divine-label">{t.gender}</label>
+                    <div className="grid grid-cols-3 gap-3">
+                        {['male', 'female', 'other'].map((g) => (
+                            <button
+                                key={g}
+                                type="button"
+                                onClick={() => setFormData({ ...formData, gender: g })}
+                                className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold uppercase tracking-wide border transition-all ${formData.gender === g
+                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-white hover:border-indigo-200'
+                                    }`}
+                            >
+                                {g === 'male' && <User className="w-3.5 h-3.5" />}
+                                {g === 'female' && <User className="w-3.5 h-3.5" />}
+                                {g === 'other' && <Users className="w-3.5 h-3.5" />}
+                                <span>{(t as any)[g]}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="space-y-5">
                     <div className="w-full">
                         <label className="divine-label">{t.dob}</label>
@@ -232,7 +264,7 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                 <motion.button
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}
-                    disabled={loading || !formData.name || !formData.dob || !formData.tob || !formData.pob || (!formData.lat && !formData.lon)}
+                    disabled={loading || !formData.name || !formData.gender || !formData.dob || !formData.tob || !formData.pob || (!formData.lat && !formData.lon)}
                     onClick={() => onCalculate(formData)}
                     className="divine-button w-full h-12 flex items-center justify-center gap-3 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { History, Calendar, Clock, MapPin, ChevronRight, Trash2, Loader2, Sparkles } from "lucide-react";
+import { History, Calendar, Clock, MapPin, ChevronRight, Trash2, Loader2, Sparkles, User } from "lucide-react";
 import { horoscopeService, SavedHoroscope } from "@/lib/services/horoscope";
 import { createClient } from "@/lib/supabase";
 
@@ -131,6 +131,12 @@ export default function SavedHoroscopes({ onSelect, language = 'en' }: SavedHoro
                                                 <Clock className="w-3.5 h-3.5 text-indigo-300" />
                                                 <span>{h.tob}</span>
                                             </div>
+                                            {h.gender && (
+                                                <div className="flex items-center gap-3 text-slate-500 text-[11px] font-bold uppercase tracking-wide">
+                                                    <User className="w-3.5 h-3.5 text-indigo-300" />
+                                                    <span className="capitalize">{h.gender}</span>
+                                                </div>
+                                            )}
                                             <div className="flex items-center gap-3 text-slate-500 text-[11px] font-bold uppercase tracking-wide">
                                                 <MapPin className="w-3.5 h-3.5 text-indigo-300" />
                                                 <span className="truncate max-w-[150px]">{h.pob}</span>

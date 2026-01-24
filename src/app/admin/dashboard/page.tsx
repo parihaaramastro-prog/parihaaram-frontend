@@ -14,6 +14,7 @@ import { consultationService } from "@/lib/services/consultation";
 import { profileService, User } from "@/lib/services/profile";
 import { settingsService } from "@/lib/services/settings";
 import { creditService } from "@/lib/services/credits";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 import Link from "next/link";
 import ConfirmationModal from "@/components/ConfirmationModal";
@@ -24,7 +25,8 @@ export default function AdminDashboard() {
     const [astrologers, setAstrologers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ total: 0, pending: 0, complete: 0 });
-    const [activeTab, setActiveTab] = useState<'consultations' | 'staff' | 'settings' | 'users' | 'ai-config'>('consultations');
+    const [metrics, setMetrics] = useState<any>(null);
+    const [activeTab, setActiveTab] = useState<'overview' | 'consultations' | 'staff' | 'settings' | 'users' | 'ai-config'>('overview');
 
     const [confirmationState, setConfirmationState] = useState<{
         isOpen: boolean;
@@ -87,6 +89,11 @@ export default function AdminDashboard() {
             // Fetch Users from Admin API (includes Google OAuth users & Credits)
             const userRes = await fetch('/api/admin/users');
             const userData = await userRes.json();
+
+            // Fetch Stats API
+            const statsRes = await fetch('/api/admin/stats');
+            const statsData = await statsRes.json();
+            setMetrics(statsData);
 
             setConsultations(conData);
             setAstrologers(astroData);
@@ -353,6 +360,7 @@ export default function AdminDashboard() {
 
                 <nav className="flex items-center bg-slate-100/50 p-1.5 rounded-xl">
                     {[
+                        { id: 'overview', label: 'Monitor' },
                         { id: 'consultations', label: 'Pipeline' },
                         { id: 'staff', label: 'Staff' },
                         { id: 'users', label: 'Users' },
@@ -398,6 +406,73 @@ export default function AdminDashboard() {
                 <div className="max-w-[1600px] mx-auto space-y-6 pb-20">
 
                     <AnimatePresence mode="wait">
+                        {activeTab === 'overview' && metrics && (
+                            <motion.div
+                                key="overview"
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                className="space-y-6"
+                            >
+                                {/* KPI Cards */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="p-2 bg-indigo-50 rounded-lg"><Activity className="w-5 h-5 text-indigo-600" /></div>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Reports</p>
+                                        </div>
+                                        <p className="text-3xl font-bold text-slate-900">{metrics.overview.total_reports}</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="p-2 bg-emerald-50 rounded-lg"><MessageSquare className="w-5 h-5 text-emerald-600" /></div>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">AI Chats</p>
+                                        </div>
+                                        <p className="text-3xl font-bold text-slate-900">{metrics.overview.active_chats}</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="p-2 bg-amber-50 rounded-lg"><Users className="w-5 h-5 text-amber-600" /></div>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Messages</p>
+                                        </div>
+                                        <p className="text-3xl font-bold text-slate-900">{metrics.overview.total_messages}</p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="p-2 bg-purple-50 rounded-lg"><ArrowUpRight className="w-5 h-5 text-purple-600" /></div>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Growth (7d)</p>
+                                        </div>
+                                        <p className="text-3xl font-bold text-slate-900">+{metrics.overview.growth_rate}</p>
+                                    </div>
+                                </div>
+
+                                {/* Chart */}
+                                <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-8">Report Generation Velocity (30 Days)</h3>
+                                    <div className="h-[300px] w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={metrics.chart}>
+                                                <defs>
+                                                    <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3} />
+                                                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
+                                                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
+                                                <Tooltip
+                                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                                    cursor={{ stroke: '#6366f1', strokeWidth: 2 }}
+                                                />
+                                                <Area type="monotone" dataKey="count" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+
                         {activeTab === 'consultations' && (
                             <motion.div
                                 key="consultations"

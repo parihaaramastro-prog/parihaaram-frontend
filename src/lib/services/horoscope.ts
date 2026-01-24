@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase";
 export interface SavedHoroscope {
     id: string;
     name: string;
+    gender: string;
     dob: string;
     tob: string;
     pob: string;
@@ -26,6 +27,7 @@ export const horoscopeService = {
             .insert({
                 user_id: user.id,
                 name: data.name,
+                gender: data.gender,
                 dob: data.dob,
                 tob: data.tob,
                 pob: data.pob,
