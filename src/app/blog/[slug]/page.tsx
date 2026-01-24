@@ -7,6 +7,8 @@ import TableOfContents from "@/components/blog/TableOfContents";
 import BlogCTA from "@/components/blog/BlogCTA";
 import { BLOG_POSTS } from "@/lib/blog-data";
 
+import { Metadata } from "next";
+
 // This is correct for Next.js 13+ App Router
 export async function generateStaticParams() {
     return BLOG_POSTS.map((post) => ({
@@ -18,6 +20,36 @@ interface BlogPostPageProps {
     params: Promise<{
         slug: string;
     }>;
+}
+
+export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
+    const { slug } = await params;
+    const post = BLOG_POSTS.find((p) => p.slug === slug);
+
+    if (!post) {
+        return {
+            title: 'Post Not Found | Pariharam',
+        };
+    }
+
+    return {
+        title: `${post.title} | Pariharam Blog`,
+        description: post.excerpt,
+        keywords: post.tags,
+        openGraph: {
+            title: post.title,
+            description: post.excerpt,
+            type: 'article',
+            publishedTime: post.date,
+            authors: [post.author],
+            tags: post.tags,
+        },
+        twitter: {
+            card: 'summary_large_image',
+            title: post.title,
+            description: post.excerpt,
+        }
+    };
 }
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {

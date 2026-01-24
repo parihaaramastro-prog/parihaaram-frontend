@@ -124,7 +124,7 @@ function HomeContent() {
             {/* Fixed Top Header - Show when user is logged in */}
 
 
-            <main className={`relative min-h-screen flex flex-col items-center ${results ? 'pt-32' : 'pt-16'} pb-40 px-8 md:px-12 overflow-x-hidden transition-all duration-700`}>
+            <main className={`relative min-h-screen flex flex-col items-center ${results ? 'pt-8' : 'pt-0'} pb-40 px-8 md:px-12 overflow-x-hidden transition-all duration-700`}>
                 <div className={`w-full ${results ? 'max-w-[1600px] flex flex-col items-center' : 'max-w-[1400px] grid lg:grid-cols-2 gap-12 lg:gap-24 items-center text-left'} transition-all duration-1000 ease-out font-sans`}>
 
                     {!results && (
@@ -208,9 +208,9 @@ function HomeContent() {
                     </div>
 
                     {!results && (
-                        <div className="w-full space-y-24">
+                        <div className="w-full max-w-[1400px] space-y-24 mt-24">
                             {/* Compatibility Lab Teaser */}
-                            <section className="max-w-[1400px] mx-auto px-6 pt-12">
+                            <section className="px-6 pt-12">
                                 <Link href="/vibecheck" className="block group">
                                     <div className="relative overflow-hidden bg-gradient-to-r from-pink-500 to-indigo-600 rounded-[3rem] p-1 shadow-2xl shadow-indigo-500/10">
                                         <div className="bg-white rounded-[2.9rem] p-8 md:p-16 text-center space-y-6 relative overflow-hidden">
@@ -243,7 +243,7 @@ function HomeContent() {
                             </section>
 
                             {/* Features Section */}
-                            <section id="features" className="max-w-[1400px] mx-auto px-6 pt-24">
+                            <section id="features" className="px-6 pt-24">
                                 <div className="text-center space-y-4 mb-16">
                                     <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] bg-indigo-50 px-3 py-1 rounded-full">Why Choose Pariharam</span>
                                     <h2 className="text-4xl font-black text-slate-900 tracking-tight">Ancient Wisdom,<br />Modern Precision</h2>
@@ -267,7 +267,7 @@ function HomeContent() {
                             </section>
 
                             {/* New: AI Spotlight Section */}
-                            <section className="max-w-[1400px] mx-auto px-6">
+                            <section className="px-6">
                                 <div className="relative rounded-[3rem] overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl shadow-indigo-500/20">
                                     <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-20 mix-blend-overlay" />
                                     <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-900/50" />
@@ -324,7 +324,7 @@ function HomeContent() {
                             </section>
 
                             {/* New: 2026 Predictions Preview */}
-                            <section className="max-w-[1400px] mx-auto px-6 py-12">
+                            <section className="px-6 py-12">
                                 <div className="text-center space-y-4 mb-12">
                                     <span className="text-[10px] font-bold text-amber-600 uppercase tracking-[0.2em] bg-amber-50 px-3 py-1 rounded-full">Annual Forecast</span>
                                     <h2 className="text-4xl font-black text-slate-900 tracking-tight">2026 Horoscope Predictions</h2>
@@ -348,7 +348,7 @@ function HomeContent() {
                             <Testimonials />
 
                             {/* Trust Section */}
-                            <section id="trust" className="max-w-[1400px] mx-auto px-6">
+                            <section id="trust" className="px-6">
                                 <div className="bg-slate-900 text-white rounded-[3rem] p-12 md:p-24 text-center space-y-8 relative overflow-hidden">
                                     <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/20 via-slate-900/0 to-transparent" />
                                     <div className="relative z-10 space-y-6">
@@ -360,8 +360,6 @@ function HomeContent() {
                                     </div>
                                 </div>
                             </section>
-
-
                         </div>
                     )}
                 </div>
