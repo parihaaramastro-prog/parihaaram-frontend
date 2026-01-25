@@ -23,69 +23,97 @@ const RASHI_ELEMENTS: Record<number, string> = {
 };
 
 export const calculateVibe = (n1Idx: number, n2Idx: number, r1Idx: number, r2Idx: number): CompatibilityResult => {
+    // NOTE: We now strictly use Moon Sign (Rashi) instead of Nakshatra (Star).
+    // Reason: Nakshatra changes too fast (sensitive to birth time). Rashi is stable for ~2.5 days.
+
     let score = 50;
 
-    // 1. Gana Porutham (Temperament)
-    const g1 = NAKSHATRA_GANAS[n1Idx];
-    const g2 = NAKSHATRA_GANAS[n2Idx];
-
-    if (g1 === g2) {
-        score += 20; // Same temperament
-    } else if ((g1 === 0 && g2 === 1) || (g1 === 1 && g2 === 0)) {
-        score += 10; // Deva + Manushya is okay
-    } else if (g1 === 2 || g2 === 2) {
-        score -= 10; // Rakshasa clash potential
-    }
-
-    // 2. Rasi Element
+    // -----------------------------------------
+    // 1. Elemental Chemistry (The Foundation)
+    // -----------------------------------------
     const e1 = RASHI_ELEMENTS[r1Idx];
     const e2 = RASHI_ELEMENTS[r2Idx];
 
     let dynamic = `${e1} & ${e2}`;
 
     if (e1 === e2) {
-        score += 15; // Same element flows well
+        score += 20; // Same element = Deep Understanding
     } else if (
         (e1 === "Fire" && e2 === "Air") || (e1 === "Air" && e2 === "Fire") ||
         (e1 === "Water" && e2 === "Earth") || (e1 === "Earth" && e2 === "Water")
     ) {
-        score += 15; // Complementary
+        score += 25; // Complementary = Growth
     } else if (
         (e1 === "Fire" && e2 === "Water") || (e1 === "Water" && e2 === "Fire")
     ) {
-        score -= 10; // Steam/Extinguish
+        score -= 20; // Clash = Steam / Extinguish
+    } else if (
+        (e1 === "Air" && e2 === "Earth") || (e1 === "Earth" && e2 === "Air")
+    ) {
+        score -= 10; // Disconnect = Dust storm
     }
 
-    // 3. Rajju (Star Distance check - Simplified)
-    // Avoid same star group typically, but for Vibe Check we keep it positive.
-    if (n1Idx === n2Idx) {
-        score += 5; // Intense connection
-    } else {
-        const dist = Math.abs(n1Idx - n2Idx);
-        if (dist === 13 || dist === 14) {
-            score += 15; // Opposite attraction
-        }
+    // -----------------------------------------
+    // 2. Lunar Geometry (The Angle)
+    // -----------------------------------------
+    // Calculate distance from R1 to R2 (0 to 11)
+    const distance: number = (r2Idx - r1Idx + 12) % 12;
+
+    // We interpret the "House" position of User 2 relative to User 1
+    // 0 = Same Sign (1st)
+    // 6 = Opposite Sign (7th) 
+
+    switch (distance) {
+        case 0: // Same Sign
+            score += 20;
+            break;
+        case 6: // Opposite (7th) - Magnetic
+            score += 30;
+            break;
+        case 4: // 5th (Trine) - Creativity/Romance
+        case 8: // 9th (Trine) - Luck/Growth
+            score += 25;
+            break;
+        case 2: // 3rd - Effort/Friends
+        case 10: // 11th - Gains/Social
+            score += 15;
+            break;
+        case 3: // 4th - Comfort/Square
+        case 9: // 10th - Work/Square
+            score += 5; // Good friction
+            break;
+        case 5: // 6th - Conflict/Service
+        case 7: // 8th - Deep/Sudden/Transformative
+            score -= 25; // The "Shashtashtaka" - Spicy/Hard
+            break;
+        case 1: // 2nd - Family/Assets
+        case 11: // 12th - Loss/Bed pleasures/Exit
+            score -= 5;
+            break;
     }
 
     // Clamp Score
-    score = Math.min(98, Math.max(30, score));
+    score = Math.min(98, Math.max(12, score));
 
-    // Generate Title & Desc
+    // Generate Title & Desc based on Geometric Logic
     let title = "";
     let desc = "";
 
-    if (score > 80) {
-        title = "Electric Connection ⚡";
-        desc = "Your energies amplify each other. A rare and powerful resonance.";
-    } else if (score > 60) {
-        title = "Solid Harmony 🌿";
-        desc = "Balanced and grounded. You understand each other's rhythms well.";
-    } else if (score > 40) {
+    if (score > 85) {
+        title = "Electric Synergy ⚡";
+        desc = "A rare, high-voltage alignment. You naturally amplify each other's strengths.";
+    } else if (score > 70) {
+        title = "Golden Flow ✨";
+        desc = "Effortless understanding. Your emotional frequencies are perfectly tuned.";
+    } else if (score > 50) {
+        title = "Solid Bond 🌿";
+        desc = "Balanced and workable. Requires some communication, but the foundation is strong.";
+    } else if (score > 35) {
         title = "Spicy Friction 🌶️";
-        desc = "Intense but volatile. High highs and confusing lows.";
+        desc = "Intense, passionate, but volatile. Great for short term, hard work for long term.";
     } else {
         title = "Karmic Lesson 🌪️";
-        desc = "A challenging dynamic meant to teach you both patience and growth.";
+        desc = "A challenging geometry designed to teach you patience, or to break patterns.";
     }
 
     return { score, title, description: desc, dynamic };

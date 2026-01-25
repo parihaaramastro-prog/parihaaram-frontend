@@ -203,7 +203,7 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
         <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-full px-6 md:px-12 space-y-8 pb-32 text-left relative"
+            className="w-full max-w-full md:px-12 space-y-8 pb-32 text-left relative"
         >
 
             {/* Header Info */}
@@ -223,16 +223,16 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
 
                 {/* Big Accessible Language Switcher */}
                 <div className="flex justify-center">
-                    <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center gap-2 shadow-inner">
+                    <div className="bg-transparent md:bg-slate-100 p-0 md:p-1.5 rounded-none md:rounded-2xl flex items-center gap-2 shadow-none md:shadow-inner">
                         <button
                             onClick={() => onLanguageChange?.('en')}
-                            className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${language === 'en' ? 'bg-white text-indigo-600 shadow-sm scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                            className={`px-4 md:px-6 py-2 md:py-2.5 rounded-full md:rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${language === 'en' ? 'bg-indigo-600 text-white md:bg-white md:text-indigo-600 shadow-md md:shadow-sm scale-105' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             English
                         </button>
                         <button
                             onClick={() => onLanguageChange?.('ta')}
-                            className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${language === 'ta' ? 'bg-white text-indigo-600 shadow-sm scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                            className={`px-4 md:px-6 py-2 md:py-2.5 rounded-full md:rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${language === 'ta' ? 'bg-indigo-600 text-white md:bg-white md:text-indigo-600 shadow-md md:shadow-sm scale-105' : 'text-slate-400 hover:text-slate-600'}`}
                         >
                             தமிழ்
                         </button>
@@ -287,8 +287,8 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
             </div>
 
             {/* About User Card (Moved Here) */}
-            <div className="w-full max-w-[1200px] mx-auto">
-                <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm space-y-6">
+            <div className="w-full max-w-[1200px] mx-auto px-6 md:px-0">
+                <div className="md:bg-white md:border md:border-slate-200 md:rounded-2xl md:p-8 md:shadow-sm space-y-6">
                     <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
                         <Info className="w-5 h-5 text-indigo-600" />
                         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">
@@ -296,11 +296,11 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                         </h3>
                     </div>
                     <div className="space-y-4">
-                        <div className="bg-gradient-to-br from-indigo-50 to-white p-6 rounded-2xl border border-indigo-100">
-                            <h4 className="text-lg font-bold text-indigo-900 mb-2">
+                        <div className="bg-transparent md:bg-gradient-to-br md:from-indigo-50 md:to-white p-0 md:p-6 rounded-none md:rounded-2xl border-none md:border md:border-indigo-100">
+                            <h4 className="text-xl md:text-lg font-bold text-slate-900 md:text-indigo-900 mb-4 md:mb-2 text-center md:text-left">
                                 {language === 'ta' ? lagnaPersonality.title_ta : lagnaPersonality.title}
                             </h4>
-                            <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                            <p className="text-base md:text-sm text-slate-600 md:text-slate-700 leading-relaxed font-normal md:font-medium text-justify md:text-left">
                                 {language === 'ta' ? lagnaPersonality.desc_ta : lagnaPersonality.desc}
                             </p>
                         </div>
@@ -309,7 +309,7 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
             </div>
 
             {/* Charts & AI Section Restructured */}
-            <div className="space-y-12 w-full max-w-[1200px] mx-auto">
+            <div className="space-y-12 w-full max-w-[1200px] mx-auto px-6 md:px-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                     {/* Main Chart */}
                     <section className="space-y-6 h-full">
@@ -317,7 +317,7 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                             <h3 className="text-lg font-bold text-slate-900 uppercase tracking-wide">{t.mainChart}</h3>
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">{t.structural}</span>
                         </div>
-                        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm h-full max-h-[500px] flex flex-col justify-center">
+                        <div className="bg-white/50 md:bg-white border border-slate-100 md:border-slate-200 rounded-xl p-2 md:p-4 shadow-sm h-full max-h-[500px] flex flex-col justify-center">
                             <SouthIndianChart
                                 title={language === 'ta' ? "ராசி கட்டம்" : "Rasi Chart"}
                                 lagnaIdx={results.lagna.idx}
@@ -338,7 +338,7 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                                 <h3 className="text-lg font-bold text-slate-900 uppercase tracking-wide">{t.divisionalChart}</h3>
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">{t.internalStrength}</span>
                             </div>
-                            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm h-full max-h-[500px] flex flex-col justify-center">
+                            <div className="bg-white/50 md:bg-white border border-slate-100 md:border-slate-200 rounded-xl p-2 md:p-4 shadow-sm h-full max-h-[500px] flex flex-col justify-center">
                                 <SouthIndianChart
                                     title={language === 'ta' ? "நவாம்ச கட்டம்" : "Navamsa Chart"}
                                     lagnaIdx={results.navamsa_chart.lagna.rasi_idx}
