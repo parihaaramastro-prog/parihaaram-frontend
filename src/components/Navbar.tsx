@@ -167,9 +167,10 @@ export default function Navbar() {
                         )}
 
                         {/* Mobile Menu Toggle */}
+                        {/* Mobile Menu Toggle - HIDDEN AS PER USER REQUEST */}
                         <button
                             onClick={() => setIsMenuOpen(!isMenuOpen)}
-                            className="lg:hidden p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                            className="hidden p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
                         >
                             {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                         </button>

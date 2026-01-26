@@ -339,18 +339,23 @@ function ChatContent() {
         const isPrimary = modalMode === 'primary';
 
         try {
-            // Update Session in DB, but DO NOT trigger AI or add messages yet.
-            // This keeps the chat "empty" so the "Choose a Topic" UI remains visible.
             if (isPrimary) {
                 await chatService.updateSessionProfiles(currentChatId, profile.id, undefined);
                 setPrimaryProfile(profile);
+
+                // Auto-trigger Life Prediction
+                // We send a hidden message acting as the user asking for a prediction.
+                // We pass the profile explicitly in overrideParams to ensure it's used even if state update is pending.
+                const autoPrompt = `Analyze my chart (${profile.name}) and give me a relatable life prediction. Focus on my nature, current vibe, and what's coming up. End with a hook to ask more questions.`;
+
+                // Only trigger if this is a fresh start (no messages yet) or user explicitly switches (context switch)
+                // Actually, user requested "when profile is selected", so we just do it.
+                handleSend(autoPrompt, true, { p1: profile });
+
             } else {
                 await chatService.updateSessionProfiles(currentChatId, undefined, profile.id);
                 setSecondaryProfile(profile);
             }
-
-            // We rely on the "Empty State" UI (State 2) to prompt the user for the next step.
-            // This ensures no credits are used until they actually click a topic.
 
         } catch (e) {
             console.error("Error selecting profile:", e);
@@ -736,17 +741,29 @@ function ChatContent() {
                                     className="flex items-center gap-1.5 bg-amber-50/50 hover:bg-amber-100/80 text-amber-700 border border-amber-200/50 px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-colors backdrop-blur-sm shadow-sm"
                                 >
                                     <Coins className="w-3.5 h-3.5" />
-                                    <span>{credits !== null ? credits : '-'}</span>
+                                    <span>
+                                        {credits !== null
+                                            ? (credits > 999 ? '999+' : credits)
+                                            : '-'
+                                        }
+                                    </span>
                                 </button>
 
                                 <button
                                     onClick={() => createNewChat()}
-                                    className="flex items-center gap-1.5 bg-slate-900/90 hover:bg-slate-800 text-white px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap shadow-md hover:shadow-lg backdrop-blur-sm"
+                                    className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-slate-900 hover:bg-slate-800 text-white transition-colors shadow-md hover:shadow-lg backdrop-blur-sm"
+                                    title="New Chat"
                                 >
-                                    <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    New
+                                    <Plus className="w-4 h-4" />
                                 </button>
 
+                                <Link
+                                    href="/dashboard"
+                                    className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors border border-slate-200 shadow-sm"
+                                    title="Exit Chat"
+                                >
+                                    <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5" />
+                                </Link>
                             </div>
                         </div>
 
@@ -843,7 +860,7 @@ function ChatContent() {
                         {/* ACTIVE STATE */}
                         {credits !== null && credits > 0 && (
                             <>
-                                {visibleMessages.length === 0 ? (
+                                {visibleMessages.length === 0 && !isTyping ? (
                                     <div className="h-full flex flex-col justify-center items-center pb-20 text-center max-w-lg mx-auto px-4">
                                         {!primaryProfile ? (
                                             // STATE 1: No Profile Selected
@@ -953,18 +970,20 @@ function ChatContent() {
                         <div className="px-4 pb-4 pt-2 shrink-0 max-w-4xl mx-auto w-full z-10 relative">
 
                             {/* Prompt Pills (Floating above input) */}
-                            <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
-                                {presets.slice(0, 3).map((p, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => p.action ? p.action() : handleSend(p.query)}
-                                        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-indigo-700 border border-indigo-100 hover:border-indigo-300 rounded-full text-xs font-bold shadow-sm transition-all whitespace-nowrap backdrop-blur-sm"
-                                    >
-                                        {p.icon}
-                                        <span>{p.label}</span>
-                                    </button>
-                                ))}
-                            </div>
+                            {!isTyping && (
+                                <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
+                                    {presets.slice(0, 3).map((p, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => p.action ? p.action() : handleSend(p.query)}
+                                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-indigo-700 border border-indigo-100 hover:border-indigo-300 rounded-full text-xs font-bold shadow-sm transition-all whitespace-nowrap backdrop-blur-sm"
+                                        >
+                                            {p.icon}
+                                            <span>{p.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
 
                             <div className="relative bg-white rounded-[2rem] p-2 pr-2 flex items-end gap-2 shadow-2xl shadow-indigo-900/5 ring-1 ring-slate-900/5 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
                                 <textarea
