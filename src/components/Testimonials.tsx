@@ -83,7 +83,7 @@ export default function Testimonials() {
                     </motion.p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-0 md:gap-6 -mx-6 md:mx-0 divide-y md:divide-y-0 divide-slate-200">
                     {testimonials.map((testimonial, index) => (
                         <motion.div
                             key={testimonial.id}
@@ -92,7 +92,7 @@ export default function Testimonials() {
                             viewport={{ once: true }}
                             transition={{ delay: index * 0.1 }}
                             whileHover={{ y: -5 }}
-                            className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300 flex flex-col justify-between h-full"
+                            className="bg-white p-8 md:p-6 rounded-none md:rounded-2xl shadow-none md:shadow-sm border-x-0 md:border border-slate-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300 flex flex-col justify-between h-full"
                         >
                             <div className="space-y-4">
                                 <div className="text-indigo-500">

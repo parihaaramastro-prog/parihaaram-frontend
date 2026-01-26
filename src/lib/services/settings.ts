@@ -8,6 +8,7 @@ export interface AppSettings {
     ai_model?: string;
     system_prompt?: string;
     is_prompt_active?: boolean;
+    prompt_presets?: any[];
 }
 
 export const settingsService = {

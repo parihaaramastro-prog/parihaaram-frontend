@@ -4,13 +4,10 @@ import { PostHogProvider } from 'posthog-js/react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
     posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY || 'phc_placeholder_key', {
         api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
         capture_pageview: false, // We manually capture pageviews for Next.js routing
-        loaded: (posthog) => {
-            if (process.env.NODE_ENV === 'development') posthog.debug();
-        }
     });
 }
 

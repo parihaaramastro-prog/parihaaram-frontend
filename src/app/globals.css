@@ -97,13 +97,13 @@ body {
     background: #ffffff;
     border: 1.5px solid var(--border-color);
     border-radius: 0.75rem;
-    padding: 0.875rem 1rem;
-    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.9375rem;
     font-weight: 500;
     color: var(--text-primary);
     transition: all 0.2s;
     /* Ensure minimal height for touch targets */
-    min-height: 3rem;
+    min-height: 2.75rem;
 }
 
 .divine-input:focus {
@@ -119,12 +119,12 @@ body {
 }
 
 .divine-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.075em;
+    letter-spacing: 0.05em;
     color: #64748b;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.375rem;
     margin-left: 0.25rem;
     display: block;
 }
@@ -136,10 +136,10 @@ body {
     justify-content: center;
     background: var(--primary-900);
     color: white;
-    padding: 1rem 1.5rem;
+    padding: 0.875rem 1.5rem;
     border-radius: 0.75rem;
     font-weight: 700;
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
     letter-spacing: 0.025em;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     border: none;

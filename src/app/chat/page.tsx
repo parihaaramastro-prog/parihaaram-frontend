@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import {
     Send, Bot, User, ArrowLeft, Globe,
     Lightbulb, MoreHorizontal, ArrowUp, Sidebar, CircleUser,
-    Plus, MessageSquare, Trash2, X, Sparkles, Users, Briefcase, Heart, Activity, Coins, Check, Loader2
+    Plus, MessageSquare, Trash2, X, Sparkles, Users, Briefcase, Heart, Activity, Coins, Check, Loader2, LogOut
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,6 +19,7 @@ import ProfileSelectionModal from "@/components/ProfileSelectionModal";
 import ReactMarkdown from 'react-markdown';
 import { chatService, ChatSession, ChatMessage } from "@/lib/services/chat";
 import Footer from "@/components/Footer";
+import UserProfileDropdown from "@/components/UserProfileDropdown";
 
 function ChatContent() {
     const router = useRouter();
@@ -37,6 +38,7 @@ function ChatContent() {
     const [userId, setUserId] = useState<string | null>(null);
     const [packConfig, setPackConfig] = useState({ price: 49, credits: 10 });
     const [razorpayEnabled, setRazorpayEnabled] = useState(false);
+    const [currentUser, setCurrentUser] = useState<any>(null);
 
     // Profile Lookup Map (to resolve IDs to Objects/Names)
     const [savedProfiles, setSavedProfiles] = useState<SavedHoroscope[]>([]);
@@ -66,6 +68,7 @@ function ChatContent() {
             if (user) {
                 setUserId(user.id);
                 setUserEmail(user.email || null);
+                setCurrentUser(user);
                 loadChats(user.id);
 
                 // Load Profiles for Lookup
@@ -161,23 +164,71 @@ function ChatContent() {
         fetchSession();
     }, [currentChatId, userId, savedProfiles]); // Re-run if profiles load late
 
+    const [validatingVibeCheck, setValidatingVibeCheck] = useState(false);
+
     // Auto-Start Check (New User from Landing / VibeCheck)
     useEffect(() => {
         const mode = searchParams.get('new');
 
         if (mode === 'vibecheck' && userId && savedProfiles.length >= 2) {
             // Vibe Check Flow: Latest 2 profiles (Partner is usually latest [0], You are [1] or vice-versa depending on save order)
-            // VibeCheck saves P1 (You) first, then P2 (Partner).
-            // So P2 (Partner) should be at index 0 (Newest), P1 (You) at index 1.
-            const partner = savedProfiles[0];
-            const you = savedProfiles[1];
 
-            const hasRecentSession = chats.length > 0 && chats[0].title.includes("Compatibility") && (new Date().getTime() - new Date(chats[0].updated_at).getTime() < 10000);
+            const initVibeCheck = async () => {
+                setValidatingVibeCheck(true);
+                try {
+                    let partner = savedProfiles[0];
+                    let you = savedProfiles[1];
 
-            if (!hasRecentSession) {
-                createVibeCheckSession(you, partner);
-                router.replace('/chat');
-            }
+                    // Helper to ensure chart data exists
+                    const ensureChartData = async (p: SavedHoroscope) => {
+                        if (p.chart_data && Object.keys(p.chart_data).length > 0) return p;
+
+                        console.log(`Calculating chart for ${p.name}...`);
+                        const res = await fetch("/api/astrology", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ dob: p.dob, tob: p.tob, lat: p.lat, lon: p.lon })
+                        });
+
+                        if (!res.ok) throw new Error("Failed to calculate chart");
+
+                        const data = await res.json();
+                        await horoscopeService.updateHoroscope(p.id, { chart_data: data });
+                        return { ...p, chart_data: data };
+                    };
+
+                    // Validate both profiles in parallel
+                    const [updatedPartner, updatedYou] = await Promise.all([
+                        ensureChartData(partner),
+                        ensureChartData(you)
+                    ]);
+
+                    // Update local state to prevent staleness
+                    setSavedProfiles(prev => prev.map(p => {
+                        if (p.id === updatedPartner.id) return updatedPartner;
+                        if (p.id === updatedYou.id) return updatedYou;
+                        return p;
+                    }));
+
+                    // Check for recent session to avoid dupes
+                    const hasRecentSession = chats.length > 0 && chats[0].title.includes("Compatibility") && (new Date().getTime() - new Date(chats[0].updated_at).getTime() < 10000);
+
+                    if (!hasRecentSession) {
+                        createVibeCheckSession(updatedYou, updatedPartner);
+                    }
+
+                    // Clear the param so we don't re-run
+                    router.replace('/chat');
+
+                } catch (e) {
+                    console.error("Vibe Check Init Error:", e);
+                    alert("Failed to initialize Vibe Check. Please try selecting profiles manually.");
+                } finally {
+                    setValidatingVibeCheck(false);
+                }
+            };
+
+            initVibeCheck();
 
         } else if (mode === 'true' && userId && savedProfiles.length > 0) {
             // Standard Flow
@@ -202,31 +253,8 @@ function ChatContent() {
             setPrimaryProfile(p1);
             setSecondaryProfile(p2);
 
-            // Add Greeting & Trigger Analysis
-            await chatService.addMessage(newSession.id, 'ai', `Hello! I see you want to analyze the compatibility between **${p1.name}** and **${p2.name}**. I have their birth charts ready.`);
-
-            // Auto-trigger the prompt
-            setTimeout(() => {
-                const prompt = `Analyze the detailed compatibility between ${p1.name} and ${p2.name}.
-
-**Profile 1 (${p1.name}):**
-DOB: ${p1.dob}
-Time: ${p1.tob}
-Place: ${p1.pob}
-
-**Profile 2 (${p2.name}):**
-DOB: ${p2.dob}
-Time: ${p2.tob}
-Place: ${p2.pob}
-
-Focus on:
-1. Dasha Sandhi (Timeline overlaps)
-2. Ego Conflicts (Sun/Moon positions)
-3. Long-term Stability
-4. Any "Karmic Debt" indicated by Saturn/Rahu.`;
-
-                handleSend(prompt, true, { p1, p2 }, newSession.id);
-            }, 500);
+            // Do NOT auto-trigger AI. Let the "Empty State" UI handle it.
+            // This is consistent with the new flow.
 
         } catch (e) {
             console.error(e);
@@ -249,13 +277,23 @@ Focus on:
 
     const createNewChat = async (initialMessage?: string) => {
         if (!userId) return;
+
+        // Optimization: If current chat is visually empty (no messages), just reset the context
+        // instead of creating a DB entry. This acts as a "Start Over" button.
+        if (messages.length === 0 && !initialMessage) {
+            setPrimaryProfile(null);
+            setSecondaryProfile(null);
+            return;
+        }
+
         try {
             const newSession = await chatService.createSession(userId, "New Session");
             setChats(prev => [newSession, ...prev]);
             setCurrentChatId(newSession.id);
 
-            // Add Greeting
-            await chatService.addMessage(newSession.id, 'ai', "Hello! I am Parihaaram AI. I can analyze birth charts and compatibility.\n\nTo begin, please tell me **which profile** you would like to analyze today?");
+            setCurrentChatId(newSession.id);
+
+            // Chat starts empty to show the "Select Profile" UI
 
             if (initialMessage) {
                 handleSend(initialMessage, false, undefined, newSession.id);
@@ -301,7 +339,8 @@ Focus on:
         const isPrimary = modalMode === 'primary';
 
         try {
-            // Update Session in DB
+            // Update Session in DB, but DO NOT trigger AI or add messages yet.
+            // This keeps the chat "empty" so the "Choose a Topic" UI remains visible.
             if (isPrimary) {
                 await chatService.updateSessionProfiles(currentChatId, profile.id, undefined);
                 setPrimaryProfile(profile);
@@ -310,39 +349,8 @@ Focus on:
                 setSecondaryProfile(profile);
             }
 
-            // User Message
-            const content = isPrimary
-                ? `I've selected **${profile.name}**'s profile.`
-                : `I've selected **${profile.name}** as the partner profile.`;
-
-            await chatService.addMessage(currentChatId, 'user', content);
-
-            // Refresh Messages (Optimistic update possible, but fetch is safer for consistent ID)
-            // Let's do optimistic for speed
-            const optimMsg: ChatMessage = {
-                id: Date.now().toString(),
-                role: 'user',
-                content,
-                created_at: new Date().toISOString(),
-                is_hidden: false
-            };
-            setMessages(prev => [...prev, optimMsg]);
-
-            // Trigger AI
-            setTimeout(() => {
-                if (isPrimary) {
-                    handleSend(`Analyze ${profile.name}'s chart and provide a detailed 'Life Prediction' covering:
-1. Core Nature & Personality
-2. Current Emotional State
-3. Best Career Paths
-4. Marriage & Relationship Outlook
-5. Relationship with Parents
-
-At the end, please list 3 specific follow-up questions I can ask to elaborate on these topics.`, true, { p1: profile });
-                } else {
-                    handleSend(`Compare ${primaryProfile?.name} and ${profile.name} for compatibility.`, true, { p1: primaryProfile || undefined, p2: profile });
-                }
-            }, 500);
+            // We rely on the "Empty State" UI (State 2) to prompt the user for the next step.
+            // This ensures no credits are used until they actually click a topic.
 
         } catch (e) {
             console.error("Error selecting profile:", e);
@@ -440,6 +448,8 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                 if (!primaryProfile) {
                     alert("Please select a primary profile first.");
                     openProfileSelector('primary');
+                } else if (secondaryProfile) {
+                    handleSend(`Analyze the detailed compatibility between ${primaryProfile.name} and ${secondaryProfile.name}.\n\nFocus on:\n1. Dasha Sandhi (Timeline overlaps)\n2. Ego Conflicts (Sun/Moon positions)\n3. Long-term Stability\n4. Any "Karmic Debt" indicated by Saturn/Rahu.`);
                 } else {
                     openProfileSelector('secondary');
                 }
@@ -460,6 +470,19 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                 onSelect={handleProfileSelect}
                 title={modalMode === 'primary' ? "Select Main Profile" : "Select Partner Profile"}
             />
+
+            {/* Vibe Check Loading Overlay */}
+            {validatingVibeCheck && (
+                <div className="fixed inset-0 bg-white/90 backdrop-blur-xl z-[100] flex flex-col items-center justify-center p-4 text-center">
+                    <div className="relative w-20 h-20 mb-8">
+                        <div className="absolute inset-0 border-4 border-indigo-100 rounded-full" />
+                        <div className="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                        <Sparkles className="absolute inset-0 m-auto w-8 h-8 text-indigo-600 animate-pulse" />
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">Syncing Cosmic Data</h2>
+                    <p className="text-slate-500 font-medium animate-pulse">Calculating precision planetary positions...</p>
+                </div>
+            )}
 
             {/* Pay Modal */}
             {showPayModal && (
@@ -618,7 +641,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setIsSidebarOpen(false)}
-                            className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm z-30"
+                            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm z-40"
                         />
                     )}
                 </AnimatePresence>
@@ -632,7 +655,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                         position: isMobile ? "absolute" : "relative"
                     }}
                     transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-                    className={`bg-slate-50/50 backdrop-blur-xl border-r border-slate-200 flex flex-col shrink-0 h-full z-40 w-[280px] md:w-auto h-full absolute md:relative`}
+                    className={`bg-white border-r border-slate-200 flex flex-col shrink-0 z-50 w-[280px] md:w-auto h-full absolute md:relative shadow-2xl md:shadow-none`}
                 >
                     <div className="p-4 flex items-center justify-between border-b border-slate-100">
                         <Link href="/dashboard" className="flex items-center gap-2">
@@ -689,7 +712,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                 <div className="flex-1 flex flex-col relative bg-white w-full h-full">
 
                     {/* Header */}
-                    <header className="flex flex-col border-b border-slate-50 z-10 shrink-0 bg-white">
+                    <header className="absolute top-0 inset-x-0 z-20 flex flex-col bg-white/70 backdrop-blur-md border-b border-white/20 shadow-sm transition-all duration-300">
                         <div className="px-4 py-3 md:px-6 md:py-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <button
@@ -707,53 +730,66 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                             </div>
 
                             <div className="flex items-center gap-2 sm:gap-3">
+                                {/* Credit Pill */}
                                 <button
                                     onClick={() => setShowPayModal(true)}
-                                    className="flex items-center gap-1.5 sm:gap-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+                                    className="flex items-center gap-1.5 bg-amber-50/50 hover:bg-amber-100/80 text-amber-700 border border-amber-200/50 px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-colors backdrop-blur-sm shadow-sm"
                                 >
-                                    <Coins className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    <span>{credits !== null ? credits : '-'} <span className="hidden sm:inline">Credits</span></span>
+                                    <Coins className="w-3.5 h-3.5" />
+                                    <span>{credits !== null ? credits : '-'}</span>
                                 </button>
 
                                 <button
-                                    onClick={() => router.push('/dashboard')}
-                                    className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 sm:px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap"
+                                    onClick={() => createNewChat()}
+                                    className="flex items-center gap-1.5 bg-slate-900/90 hover:bg-slate-800 text-white px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap shadow-md hover:shadow-lg backdrop-blur-sm"
                                 >
-                                    End <span className="hidden sm:inline">Chat</span>
+                                    <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    New
                                 </button>
+
                             </div>
                         </div>
 
-                        {/* Active Context Bar */}
-                        <div className="px-4 md:px-6 pb-3 pt-0 flex overflow-x-auto gap-2 items-center flex-nowrap scrollbar-hide">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2 shrink-0 hidden xs:block">Context:</span>
+                        {/* Active Context Bar - Now slimmer and bottom-bordered */}
+                        <div className="px-4 md:px-6 pb-2 pt-0 flex overflow-x-auto gap-2 items-center flex-nowrap scrollbar-hide">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1 shrink-0 hidden xs:block">Context:</span>
 
                             <button
                                 onClick={() => openProfileSelector('primary')}
-                                className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${primaryProfile ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-600'}`}
+                                className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-all ${primaryProfile ? 'bg-indigo-50/80 border-indigo-200 text-indigo-900' : 'bg-white/50 border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-600'}`}
                             >
-                                <User className="w-3.5 h-3.5" />
+                                <User className="w-3 h-3" />
                                 {primaryProfile ? primaryProfile.name : "Select Profile"}
                             </button>
 
                             {primaryProfile && (
                                 <>
                                     <span className="text-slate-300 text-[10px] shrink-0">&</span>
-                                    <button
-                                        onClick={() => openProfileSelector('secondary')}
-                                        className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${secondaryProfile ? 'bg-pink-50 border-pink-200 text-pink-900' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-pink-300 hover:text-pink-600'}`}
-                                    >
-                                        <Users className="w-3.5 h-3.5" />
-                                        {secondaryProfile ? secondaryProfile.name : "Add Partner"}
-                                        {secondaryProfile && <X className="w-3 h-3 ml-1 text-pink-400 hover:text-pink-700" onClick={(e) => { e.stopPropagation(); setSecondaryProfile(null); }} />}
-                                    </button>
+                                    {secondaryProfile ? (
+                                        <button
+                                            onClick={() => openProfileSelector('secondary')}
+                                            className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border bg-pink-50/80 border-pink-200 text-pink-900 transition-all"
+                                        >
+                                            <Users className="w-3 h-3" />
+                                            {secondaryProfile.name}
+                                            <X className="w-3 h-3 ml-1 text-pink-400 hover:text-pink-700" onClick={(e) => { e.stopPropagation(); setSecondaryProfile(null); }} />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => openProfileSelector('secondary')}
+                                            className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center border border-dashed border-slate-300 text-slate-400 hover:border-pink-300 hover:text-pink-600 hover:bg-pink-50 transition-all"
+                                            title="Add Partner"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
                                 </>
                             )}
                         </div>
                     </header>
 
-                    {/* Messages Area */}
-                    <div className={`flex-1 px-4 sm:px-8 py-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-100 relative ${credits !== null && credits <= 0 ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+                    {/* Messages Area - Added paddingTop to account for fixed header */}
+                    <div className={`flex-1 px-4 sm:px-8 pt-32 pb-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-100 relative ${credits !== null && credits <= 0 ? 'overflow-hidden' : 'overflow-y-auto'}`}>
 
                         {/* LOADING STATE - INITIAL */}
                         {(credits === null) && (
@@ -809,30 +845,55 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                             <>
                                 {visibleMessages.length === 0 ? (
                                     <div className="h-full flex flex-col justify-center items-center pb-20 text-center max-w-lg mx-auto px-4">
-                                        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 sm:mb-8">
-                                            <Bot className="w-8 h-8 sm:w-10 sm:h-10 text-indigo-600" />
-                                        </div>
-                                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-medium text-slate-900 tracking-tight leading-tight mb-4">
-                                            How can <span className="text-indigo-600">stars</span><br />guide you today?
-                                        </h1>
-                                        <p className="text-slate-500 text-sm sm:text-base mb-8">
-                                            Start by selecting a profile to get personalized insights based on Lagna, Dasha, and more.
-                                        </p>
-
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-                                            {presets.map((p, i) => (
+                                        {!primaryProfile ? (
+                                            // STATE 1: No Profile Selected
+                                            <div className="animate-in fade-in zoom-in duration-500 slides-in-from-bottom-4">
+                                                <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+                                                    <User className="w-10 h-10 text-indigo-600" />
+                                                </div>
+                                                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3">
+                                                    Who is this reading for?
+                                                </h1>
+                                                <p className="text-slate-500 text-sm sm:text-base mb-8 max-w-xs mx-auto leading-relaxed">
+                                                    Please select a birth profile to enable your personalized AI astrologer.
+                                                </p>
                                                 <button
-                                                    key={i}
-                                                    onClick={() => p.action ? p.action() : handleSend(p.query)}
-                                                    className="flex items-center gap-3 p-4 bg-white border border-slate-200 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-100/50 rounded-xl text-left transition-all group"
+                                                    onClick={() => openProfileSelector('primary')}
+                                                    className="w-full sm:w-auto px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold uppercase tracking-wider shadow-lg shadow-indigo-500/30 transition-all hover:scale-105 active:scale-95"
                                                 >
-                                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                        {p.icon}
-                                                    </div>
-                                                    <span className="text-sm font-bold text-slate-700 group-hover:text-indigo-900">{p.label}</span>
+                                                    Select Profile
                                                 </button>
-                                            ))}
-                                        </div>
+                                            </div>
+                                        ) : (
+                                            // STATE 2: Profile Selected, Ready to Chat
+                                            <div className="animate-in fade-in zoom-in duration-500">
+                                                <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                                    <Sparkles className="w-8 h-8 text-indigo-600" />
+                                                </div>
+                                                <h1 className="text-2xl sm:text-3xl font-medium text-slate-900 tracking-tight leading-tight mb-2">
+                                                    Ask about <span className="font-bold text-indigo-600">{primaryProfile.name}</span>
+                                                    {secondaryProfile && <span className="font-bold text-pink-600"> & {secondaryProfile.name}</span>}
+                                                </h1>
+                                                <p className="text-slate-500 text-sm mb-8">
+                                                    Your AI astrologer is ready. Select a topic to start (Uses Credits):
+                                                </p>
+
+                                                <div className="grid grid-cols-1 gap-3 w-full text-left">
+                                                    {presets.map((p, i) => (
+                                                        <button
+                                                            key={i}
+                                                            onClick={() => p.action ? p.action() : handleSend(p.query)}
+                                                            className="flex items-center gap-4 p-4 bg-white border border-slate-200 hover:border-indigo-500 hover:ring-1 hover:ring-indigo-500/20 rounded-xl transition-all group active:scale-[0.98]"
+                                                        >
+                                                            <div className="w-10 h-10 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                                                {p.icon}
+                                                            </div>
+                                                            <span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">{p.label}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     visibleMessages.map((msg, i) => (
@@ -849,8 +910,8 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                             <div className="flex flex-col gap-2">
                                                 <div
                                                     className={`p-4 sm:p-5 rounded-3xl text-sm sm:text-[15px] leading-relaxed shadow-sm ${msg.role === 'user'
-                                                        ? 'bg-indigo-600 text-white rounded-tr-sm'
-                                                        : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm shadow-md'
+                                                        ? 'bg-indigo-600 text-white rounded-tr-sm font-sans'
+                                                        : 'bg-white border border-slate-200 text-slate-700 rounded-tl-sm shadow-sm'
                                                         }`}
                                                 >
                                                     <ReactMarkdown
@@ -864,19 +925,6 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                                         {msg.content}
                                                     </ReactMarkdown>
                                                 </div>
-
-                                                {/* In-Chat Actions */}
-                                                {msg.role === 'ai' && shouldShowProfileButton(msg.content) && (
-                                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2">
-                                                        <button
-                                                            onClick={() => openProfileSelector(shouldShowPartnerButton(msg.content) ? 'secondary' : 'primary')}
-                                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-indigo-200"
-                                                        >
-                                                            <User className="w-4 h-4" />
-                                                            {shouldShowPartnerButton(msg.content) ? "Select Partner" : "Select Profile"}
-                                                        </button>
-                                                    </motion.div>
-                                                )}
                                             </div>
                                         </motion.div>
                                     ))
@@ -887,7 +935,7 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                         <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mt-1">
                                             <Bot className="w-4 h-4" />
                                         </div>
-                                        <div className="bg-white border border-slate-100 p-4 rounded-3xl rounded-tl-sm shadow-md flex gap-1">
+                                        <div className="bg-white border border-slate-200 p-4 rounded-3xl rounded-tl-sm shadow-sm flex gap-1">
                                             <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" />
                                             <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce delay-100" />
                                             <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce delay-200" />
@@ -895,45 +943,66 @@ At the end, please list 3 specific follow-up questions I can ask to elaborate on
                                     </motion.div>
                                 )}
 
-
-
                                 <div ref={messagesEndRef} />
                             </>
                         )}
                     </div>
 
-                    {/* Input Area */}
-                    <div className="p-4 sm:p-6 bg-white shrink-0 max-w-4xl mx-auto w-full">
-                        <div className="relative bg-slate-50 rounded-[2rem] p-2 pr-2 flex items-end gap-2 shadow-inner border border-slate-100 focus-within:border-indigo-200 focus-within:ring-4 focus-within:ring-indigo-50/50 transition-all">
-                            <textarea
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                placeholder={primaryProfile ? `Ask about ${primaryProfile.name}'s chart...` : "Ask a question..."}
-                                className="flex-1 bg-transparent border-none focus:ring-0 text-sm sm:text-base text-slate-900 placeholder:text-slate-400 min-h-[44px] max-h-[120px] py-2.5 px-2 resize-none"
-                                rows={1}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleSend();
-                                    }
-                                }}
-                            />
+                    {/* Input Area - Floating Style */}
+                    {primaryProfile ? (
+                        <div className="px-4 pb-4 pt-2 shrink-0 max-w-4xl mx-auto w-full z-10 relative">
 
-                            <button
-                                onClick={() => handleSend()}
-                                disabled={!input.trim() || isTyping}
-                                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-indigo-600 flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 mb-0.5 shadow-lg shadow-indigo-500/20"
-                            >
-                                <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
-                            </button>
+                            {/* Prompt Pills (Floating above input) */}
+                            <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
+                                {presets.slice(0, 3).map((p, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => p.action ? p.action() : handleSend(p.query)}
+                                        className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-indigo-700 border border-indigo-100 hover:border-indigo-300 rounded-full text-xs font-bold shadow-sm transition-all whitespace-nowrap backdrop-blur-sm"
+                                    >
+                                        {p.icon}
+                                        <span>{p.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="relative bg-white rounded-[2rem] p-2 pr-2 flex items-end gap-2 shadow-2xl shadow-indigo-900/5 ring-1 ring-slate-900/5 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+                                <textarea
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    placeholder={`Ask about ${primaryProfile.name}'s chart...`}
+                                    className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm sm:text-base text-slate-900 placeholder:text-slate-400 min-h-[48px] max-h-[120px] py-3.5 px-4 resize-none caret-indigo-600 font-sans"
+                                    rows={1}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSend();
+                                        }
+                                    }}
+                                />
+
+                                <button
+                                    onClick={() => handleSend()}
+                                    disabled={!input.trim() || isTyping}
+                                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-900 hover:bg-indigo-600 flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-110 active:scale-95 mb-1 shadow-lg shadow-slate-900/20"
+                                >
+                                    <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
+                                </button>
+                            </div>
+                            <p className="text-center text-[9px] sm:text-[10px] text-slate-300 mt-2 font-medium tracking-wide">
+                                AI Astrology predictions are for guidance only.
+                            </p>
                         </div>
-                        <p className="text-center text-[9px] sm:text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-widest">
-                            AI Astrology predictions are for guidance only.
-                        </p>
-                    </div>
+                    ) : (
+                        <div className="p-6 bg-transparent text-center">
+                            <p className="text-sm text-slate-400 font-medium italic">
+                                Select a profile above to start chatting
+                            </p>
+                        </div>
+                    )}
                 </div>
-            </div>
-        </main>
+            </div >
+        </main >
     );
 
 }

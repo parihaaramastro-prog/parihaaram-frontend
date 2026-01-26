@@ -41,6 +41,7 @@ export default function JsonLd() {
     return (
         <script
             type="application/ld+json"
+            suppressHydrationWarning
             dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
     );

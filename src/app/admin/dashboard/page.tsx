@@ -73,6 +73,11 @@ export default function AdminDashboard() {
     const [logSearch, setLogSearch] = useState("");
     const [logFilterUser, setLogFilterUser] = useState<string>("all");
 
+    // Presets State
+    const [presets, setPresets] = useState<{ name: string; content: string }[]>([]);
+    const [newPresetName, setNewPresetName] = useState("");
+    const [showSavePreset, setShowSavePreset] = useState(false);
+
     // Review State
     const [selectedReview, setSelectedReview] = useState<any | null>(null);
     const [reviewContent, setReviewContent] = useState("");
@@ -129,6 +134,7 @@ export default function AdminDashboard() {
             if (s.ai_model) setAiModel(s.ai_model);
             if (s.system_prompt) setSystemPrompt(s.system_prompt);
             if (s.is_prompt_active !== undefined) setIsPromptActive(s.is_prompt_active);
+            if (s.prompt_presets) setPresets(s.prompt_presets);
         }).catch(() => {
             console.warn("Settings table might need update");
         });
@@ -194,6 +200,47 @@ export default function AdminDashboard() {
         } catch (e: any) {
             alert("Settings Update Failed: " + e.message + "\n\nYou likely need to add 'is_prompt_active' column to your 'app_settings' table.");
         }
+    };
+
+    const handleSavePreset = async () => {
+        if (!newPresetName.trim()) return;
+        try {
+            const updatedPresets = [...presets, { name: newPresetName, content: systemPrompt }];
+            setPresets(updatedPresets);
+            await settingsService.updateSettings({ prompt_presets: updatedPresets });
+            setNewPresetName("");
+            setShowSavePreset(false);
+            alert("Preset saved.");
+        } catch (e: any) {
+            console.error("Save Preset Error:", e);
+            if (e.message.includes("column")) {
+                prompt("DATABASE SCHEMA UPDATE REQUIRED:\n\nCopy and run this SQL in your Supabase SQL Editor:",
+                    "ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS prompt_presets JSONB DEFAULT '[]';");
+            } else {
+                alert("Failed to save preset: " + e.message);
+            }
+        }
+    };
+
+    const handleDeletePreset = async (index: number) => {
+        if (!confirm("Delete this preset?")) return;
+        try {
+            const updatedPresets = presets.filter((_, i) => i !== index);
+            setPresets(updatedPresets);
+            await settingsService.updateSettings({ prompt_presets: updatedPresets });
+        } catch (e: any) {
+            alert("Failed to delete preset: " + e.message);
+        }
+    };
+
+    const loadPreset = (preset: { name: string, content: string }) => {
+        if (confirm(`Load '${preset.name}'? This will replace your current prompt text.`)) {
+            setSystemPrompt(preset.content);
+        }
+    };
+
+    const getUserName = (id: string) => {
+        return allUsers.find(u => u.id === id)?.full_name || 'Unknown User';
     };
 
     const handleUpdateCredits = async () => {
@@ -773,11 +820,43 @@ export default function AdminDashboard() {
                         )}
 
                         {activeTab === 'ai-config' && (
-                            <motion.div key="ai-config" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-[calc(100vh-140px)] grid grid-cols-2 gap-6">
-                                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
+                            <motion.div key="ai-config" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-[calc(100vh-140px)] grid grid-cols-12 gap-6">
+                                <div className="col-span-8 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
                                     <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                                        <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">System Prompt</h3>
-                                        <button onClick={savePrompt} className="px-4 py-1.5 bg-indigo-600 text-white rounded-md text-xs font-bold uppercase tracking-widest">Save</button>
+                                        <div className="flex items-center gap-4">
+                                            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">System Prompt</h3>
+                                            <div className="flex gap-2">
+                                                {presets.map((p, i) => (
+                                                    <button
+                                                        key={i}
+                                                        onClick={() => loadPreset(p)}
+                                                        className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-2"
+                                                    >
+                                                        {p.name}
+                                                        <span onClick={(e) => { e.stopPropagation(); handleDeletePreset(i); }} className="hover:text-red-500">×</span>
+                                                    </button>
+                                                ))}
+                                                <button onClick={() => setShowSavePreset(!showSavePreset)} className="p-1 text-indigo-600 hover:bg-indigo-50 rounded" title="Save current prompt as preset">
+                                                    {showSavePreset ? <X className="w-4 h-4" /> : <span className="text-xs font-bold flex items-center gap-1"><Grid className="w-3 h-3" /> Save Preset</span>}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {showSavePreset && (
+                                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                                                    <input
+                                                        value={newPresetName}
+                                                        onChange={e => setNewPresetName(e.target.value)}
+                                                        placeholder="Preset Name..."
+                                                        className="h-8 px-3 text-xs border border-slate-200 rounded-lg focus:border-indigo-500 outline-none"
+                                                    />
+                                                    <button onClick={handleSavePreset} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold">Save</button>
+                                                </div>
+                                            )}
+                                            <button onClick={savePrompt} className="px-4 py-1.5 bg-slate-900 text-white rounded-md text-xs font-bold uppercase tracking-widest hover:bg-slate-800">
+                                                Update Active Prompt
+                                            </button>
+                                        </div>
                                     </div>
                                     <textarea
                                         value={systemPrompt}
@@ -786,18 +865,20 @@ export default function AdminDashboard() {
                                         placeholder="Define AI persona..."
                                     />
                                 </div>
-                                <div className="bg-slate-900 rounded-2xl shadow-sm flex flex-col overflow-hidden border border-slate-800">
+                                <div className="col-span-4 bg-slate-900 rounded-2xl shadow-sm flex flex-col overflow-hidden border border-slate-800">
                                     <div className="p-3 border-b border-slate-800 bg-slate-900 flex justify-between items-center">
                                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Logs</h3>
                                     </div>
                                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
                                         {chatLogs.map(log => (
-                                            <div key={log.id} onClick={() => setSelectedLog(log)} className="p-3 rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 cursor-pointer">
+                                            <div key={log.id} onClick={() => setSelectedLog(log)} className="p-3 rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 cursor-pointer transition-colors group">
                                                 <div className="flex justify-between items-center mb-1">
-                                                    <span className="text-[9px] font-bold text-indigo-400 uppercase">{log.user_id.slice(0, 8)}</span>
+                                                    <span className="text-[10px] font-bold text-indigo-400 uppercase truncate max-w-[120px]">
+                                                        {getUserName(log.user_id)}
+                                                    </span>
                                                     <span className="text-[9px] font-mono text-slate-500">{new Date(log.created_at).toLocaleTimeString()}</span>
                                                 </div>
-                                                <p className="text-[10px] text-slate-300 line-clamp-2">{log.user_message}</p>
+                                                <p className="text-[11px] text-slate-300 line-clamp-2 group-hover:text-white transition-colors">{log.user_message}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -866,16 +947,22 @@ export default function AdminDashboard() {
                             </div>
                             <div className="p-6 overflow-y-auto space-y-4 font-mono text-xs">
                                 <div className="space-y-2">
-                                    <span className="font-bold text-indigo-600 text-xs">USER</span>
+                                    <span className="font-bold text-slate-600 text-xs tracking-widest uppercase mb-1 block">{getUserName(selectedLog.user_id)}</span>
                                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm">{selectedLog.user_message}</div>
                                 </div>
                                 <div className="space-y-2">
-                                    <span className="font-bold text-emerald-600 text-xs">AI</span>
+                                    <span className="font-bold text-emerald-600 text-xs">AI RESPONSE</span>
                                     <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100 text-sm whitespace-pre-wrap">{selectedLog.ai_response}</div>
                                 </div>
                                 <div className="space-y-1">
-                                    <span className="font-bold text-slate-400">CONTEXT</span>
-                                    <div className="bg-slate-900 p-3 rounded-lg text-amber-500 overflow-x-auto">{selectedLog.context_snapshot}</div>
+                                    <details className="group">
+                                        <summary className="font-bold text-slate-400 cursor-pointer list-none flex items-center gap-2">
+                                            <span>▶</span> CONTEXT DATA (Hidden)
+                                        </summary>
+                                        <div className="mt-2 bg-slate-900 p-3 rounded-lg text-amber-500 overflow-x-auto text-[10px]">
+                                            {selectedLog.context_snapshot}
+                                        </div>
+                                    </details>
                                 </div>
                             </div>
                         </div>

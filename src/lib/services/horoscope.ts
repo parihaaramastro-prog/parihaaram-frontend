@@ -40,6 +40,17 @@ export const horoscopeService = {
         profileCache = null; // Invalidate cache
     },
 
+    async updateHoroscope(id: string, updates: Partial<SavedHoroscope>) {
+        const supabase = createClient();
+        const { error } = await supabase
+            .from('horoscopes')
+            .update(updates)
+            .eq('id', id);
+
+        if (error) throw error;
+        profileCache = null; // Invalidate cache
+    },
+
     async getSavedHoroscopes(forceRefresh = false) {
         if (profileCache && !forceRefresh) return profileCache;
 

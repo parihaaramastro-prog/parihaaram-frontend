@@ -112,14 +112,7 @@ export default function Footer() {
                                     parihaaramastro@gmail.com
                                 </a>
                             </li>
-                            <li>
-                                <a href="tel:+919789516575" className="group flex items-center gap-3 text-sm text-slate-500 hover:text-indigo-600 transition-colors">
-                                    <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:border-indigo-200 group-hover:bg-indigo-50 transition-colors">
-                                        <Phone className="w-4 h-4" />
-                                    </div>
-                                    +91 97895 16575
-                                </a>
-                            </li>
+
                             <li className="flex gap-2">
                                 <a href="#" className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:border-black hover:bg-black/5 hover:text-black transition-all">
                                     <XIcon className="w-3.5 h-3.5" />

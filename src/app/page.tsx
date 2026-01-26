@@ -123,56 +123,58 @@ function HomeContent() {
         <>
             {/* Announcement Bar */}
             <Link href="/predictions">
-                <div className="bg-indigo-600 text-white py-2 px-4 text-center cursor-pointer hover:bg-indigo-700 transition-colors relative z-50">
-                    <p className="text-xs md:text-sm font-medium flex items-center justify-center gap-2">
-                        <span className="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">New</span>
-                        <span>Check out your 2026 Horoscope Predictions (English & Tamil)</span>
-                        <ArrowRight className="w-4 h-4" />
-                    </p>
+                <div className="bg-indigo-600 text-white py-4 px-6 cursor-pointer hover:bg-indigo-700 transition-colors relative z-50">
+                    <div className="flex flex-row items-center justify-center md:justify-center gap-3 max-w-7xl mx-auto">
+                        <span className="bg-white/20 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider shrink-0">New</span>
+                        <p className="text-xs md:text-sm font-medium leading-relaxed flex-1 md:flex-none text-left md:text-center">
+                            Check out your 2026 Horoscope Predictions (English & Tamil)
+                        </p>
+                        <ArrowRight className="w-4 h-4 shrink-0" />
+                    </div>
                 </div>
             </Link>
 
             {/* Fixed Top Header - Show when user is logged in */}
 
 
-            <main className={`relative min-h-screen flex flex-col items-center ${results ? 'pt-8' : 'pt-0'} pb-40 px-8 md:px-12 overflow-x-hidden transition-all duration-700`}>
+            <main className={`relative min-h-screen flex flex-col items-center ${results ? 'pt-8' : 'pt-0'} pb-24 md:pb-40 px-6 md:px-12 overflow-x-hidden transition-all duration-700`}>
                 <div className={`w-full ${results ? 'max-w-[1600px] flex flex-col items-center' : 'max-w-[1400px] grid lg:grid-cols-2 gap-12 lg:gap-24 items-center text-left'} transition-all duration-1000 ease-out font-sans`}>
 
                     {!results && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="mb-12 lg:mb-0 space-y-8"
+                            className="mt-4 mb-8 lg:mb-0 space-y-5 md:space-y-8"
                         >
 
 
-                            <h1 className={`text-6xl md:text-8xl font-black text-slate-900 tracking-tighter leading-[0.9] ${lang === 'ta' ? 'font-tamil' : ''}`}>
-                                {lang === 'ta' ? 'உங்கள் ஜாதகம்' : 'Discover Your'} <br />
+                            <h1 className={`text-4xl sm:text-5xl md:text-8xl font-black text-slate-900 tracking-tighter leading-tight md:leading-[0.9] ${lang === 'ta' ? 'font-tamil' : ''}`}>
+                                {lang === 'ta' ? 'உங்கள் ஜாதகம்' : 'Get Your Free'} <br />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
-                                    {lang === 'ta' ? 'இங்கே கணிக்கவும்' : 'Destiny'}
+                                    {lang === 'ta' ? 'இங்கே கணிக்கவும்' : 'Vedic Birth Chart'}
                                 </span>
                             </h1>
-                            <p className="text-slate-600 text-xl font-medium leading-relaxed max-w-lg">
+                            <p className="text-slate-600 text-sm md:text-lg font-medium leading-relaxed max-w-lg">
                                 {lang === 'ta'
-                                    ? 'பரிகாரம்: இந்தியாவின் முதல் துல்லியமான ஜோதிட தளம்.'
-                                    : 'Pariharam provides accurate birth charts and personalized insights based on authentic Vedic principles.'}
+                                    ? 'பரிகாரம்: இந்தியாவின் முதல் துல்லியமான ஜோதிட தளம். இலவசமாக பதிவு செய்து உங்கள் ஜாதகத்தை கணிக்கவும்.'
+                                    : 'Unlock your detailed life blueprint. Create a free account to access authentic Vedic predictions, career insights, and compatibility reports instantly.'}
                             </p>
 
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.2 }}
-                                className="pt-2"
+                                className="pt-1 md:pt-2"
                             >
-                                <Link href="/ai" className="group relative inline-flex items-center gap-3 bg-slate-900 text-white pl-5 pr-4 py-3 rounded-full hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-500/20 overflow-hidden">
+                                <Link href="/ai" className="group relative inline-flex items-center gap-3 bg-slate-900 text-white pl-4 pr-3 py-2.5 rounded-full hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-500/20 overflow-hidden">
                                     <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                     <div className="relative flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
-                                            <Sparkles className="w-4 h-4 text-indigo-300 group-hover:text-white transition-colors" />
+                                        <div className="w-7 h-7 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20">
+                                            <Sparkles className="w-3.5 h-3.5 text-indigo-300 group-hover:text-white transition-colors" />
                                         </div>
                                         <div className="text-left">
-                                            <p className="text-[10px] font-bold text-indigo-300 group-hover:text-indigo-100 uppercase tracking-wider leading-none mb-0.5">New Feature</p>
-                                            <p className="text-sm font-bold leading-none">Ask AI Astrologer &rarr;</p>
+                                            <p className="text-[9px] font-bold text-indigo-300 group-hover:text-indigo-100 uppercase tracking-wider leading-none mb-0.5">New Feature</p>
+                                            <p className="text-xs font-bold leading-none">Ask AI Astrologer &rarr;</p>
                                         </div>
                                     </div>
                                 </Link>
@@ -215,10 +217,10 @@ function HomeContent() {
                 {!results && (
                     <div className="w-full max-w-[1400px] space-y-24 mt-24">
                         {/* Compatibility Lab Teaser */}
-                        <section className="px-6 pt-12">
+                        <section className="-mx-6 md:mx-0 px-0 md:px-6 pt-12">
                             <Link href="/vibecheck" className="block group">
-                                <div className="relative overflow-hidden bg-gradient-to-r from-pink-500 to-indigo-600 rounded-[3rem] p-1 shadow-2xl shadow-indigo-500/10">
-                                    <div className="bg-white rounded-[2.9rem] p-8 md:p-16 text-center space-y-6 relative overflow-hidden">
+                                <div className="relative overflow-hidden bg-gradient-to-r from-pink-500 to-indigo-600 rounded-none md:rounded-[3rem] p-1 shadow-none md:shadow-2xl md:shadow-indigo-500/10">
+                                    <div className="bg-white rounded-none md:rounded-[2.9rem] p-8 md:p-16 text-center space-y-6 relative overflow-hidden">
                                         {/* Decor */}
                                         <div className="absolute top-0 right-0 w-64 h-64 bg-pink-50 rounded-full blur-[80px] -z-10 group-hover:bg-pink-100 transition-colors" />
                                         <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-50 rounded-full blur-[80px] -z-10 group-hover:bg-indigo-100 transition-colors" />
@@ -248,19 +250,19 @@ function HomeContent() {
                         </section>
 
                         {/* Features Section */}
-                        <section id="features" className="px-6 pt-24">
-                            <div className="text-center space-y-4 mb-16">
+                        <section id="features" className="-mx-6 md:mx-0 px-0 md:px-6 pt-24">
+                            <div className="text-center space-y-4 mb-16 px-6 md:px-0">
                                 <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] bg-indigo-50 px-3 py-1 rounded-full">Why Choose Pariharam</span>
                                 <h2 className="text-4xl font-black text-slate-900 tracking-tight">Ancient Wisdom,<br />Modern Precision</h2>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 md:gap-8 divide-y md:divide-y-0 divide-slate-200">
                                 {[
                                     { title: "Vedic Precision", desc: "Calculations based on authentic Drig Ganitha and Vakya Panchangam methods.", icon: Compass },
                                     { title: "Instant Analysis", desc: "Get your detailed birth chart and planetary positions in seconds.", icon: Clock },
                                     { title: "Privacy First", desc: "Astrologers & AI never see your name. We don't sell data or train AI on your history.", icon: Lock }
                                 ].map((feature, i) => (
-                                    <div key={i} className="p-10 bg-white border border-slate-200 rounded-[2.5rem] hover:border-indigo-600 transition-all group space-y-4 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5">
+                                    <div key={i} className="p-10 bg-white border-x-0 md:border border-slate-200 rounded-none md:rounded-[2.5rem] hover:border-indigo-600 transition-all group space-y-4 shadow-none md:shadow-sm md:hover:shadow-xl md:hover:shadow-indigo-500/5">
                                         <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-900 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                             <feature.icon className="w-6 h-6" />
                                         </div>
@@ -272,28 +274,28 @@ function HomeContent() {
                         </section>
 
                         {/* New: AI Spotlight Section */}
-                        <section className="px-6">
-                            <div className="relative rounded-[3rem] overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl shadow-indigo-500/20">
+                        <section className="-mx-6 md:mx-0 px-0 md:px-6">
+                            <div className="relative rounded-none md:rounded-[3rem] overflow-hidden bg-slate-900 border-0 md:border md:border-slate-800 shadow-none md:shadow-2xl md:shadow-indigo-500/20">
                                 <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-20 mix-blend-overlay" />
                                 <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-900/50" />
 
-                                <div className="relative z-10 grid md:grid-cols-2 gap-12 p-12 md:p-24 items-center">
-                                    <div className="space-y-8">
+                                <div className="relative z-10 grid md:grid-cols-2 gap-8 md:gap-12 p-8 md:p-24 items-center">
+                                    <div className="space-y-6 md:space-y-8">
                                         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-widest">
                                             <Sparkles className="w-4 h-4" />
                                             New Intelligence
                                         </div>
-                                        <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter leading-[1.1]">
+                                        <h2 className="text-3xl md:text-6xl font-black text-white tracking-tighter leading-[1.1]">
                                             Decode Your Destiny with <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">AI Precision</span>
                                         </h2>
-                                        <p className="text-lg text-slate-400 leading-relaxed max-w-lg">
+                                        <p className="text-base md:text-lg text-slate-400 leading-relaxed max-w-lg">
                                             Our advanced AI Astrologer analyzes planetary transits, dashas, and nakshatra padams to provide hyper-personalized insights instantly.
                                         </p>
-                                        <div className="flex flex-wrap gap-4">
-                                            <Link href="/ai" className="px-8 py-4 bg-white text-slate-900 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-indigo-50 transition-colors flex items-center gap-2">
+                                        <div className="flex flex-col sm:flex-row gap-4">
+                                            <Link href="/ai" className="px-8 py-4 bg-white text-slate-900 rounded-xl font-bold text-sm uppercase tracking-widest hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2">
                                                 Try AI Chat <ArrowRight className="w-4 h-4" />
                                             </Link>
-                                            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="px-8 py-4 bg-transparent border border-slate-700 text-white rounded-xl font-bold text-sm uppercase tracking-widest hover:border-slate-500 transition-colors">
+                                            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="px-8 py-4 bg-transparent border border-slate-700 text-white rounded-xl font-bold text-sm uppercase tracking-widest hover:border-slate-50 transition-colors">
                                                 Get Birth Chart
                                             </button>
                                         </div>
@@ -353,9 +355,11 @@ function HomeContent() {
                         <Testimonials />
 
                         {/* Trust Section */}
-                        <section id="trust" className="px-6">
-                            <div className="bg-slate-900 text-white rounded-[3rem] p-12 md:p-24 text-center space-y-8 relative overflow-hidden">
-                                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/20 via-slate-900/0 to-transparent" />
+                        <section id="trust" className="-mx-6 md:mx-0 px-0 md:px-6">
+                            <div className="bg-slate-900 text-white rounded-none md:rounded-[3rem] p-8 md:p-24 text-center space-y-8 relative overflow-hidden shadow-none md:shadow-2xl md:shadow-indigo-500/20 border-0 md:border border-slate-800">
+                                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5980?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-20 mix-blend-overlay" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-900/50" />
+
                                 <div className="relative z-10 space-y-6">
                                     <Shield className="w-12 h-12 mx-auto text-indigo-400" />
                                     <h2 className="text-3xl md:text-5xl font-black tracking-tight">Trusted by Analytic Professionals</h2>

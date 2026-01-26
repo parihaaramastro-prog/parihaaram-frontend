@@ -99,11 +99,20 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
 
         setIsSearching(true);
         try {
+            // Using featuretype=settlement to prioritize cities/towns
             const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`
+                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=10&featuretype=settlement`
             );
             const data = await response.json();
-            setSuggestions(data || []);
+
+            // Client-side filtering to remove roads/highways
+            const filtered = data.filter((item: any) =>
+                item.class === 'place' ||
+                (item.class === 'boundary' && item.type === 'administrative') ||
+                (item.class === 'landuse' && item.type === 'residential')
+            ).slice(0, 5);
+
+            setSuggestions(filtered);
             setShowSuggestions(true);
         } catch (error) {
             console.error("Error fetching places:", error);
@@ -138,14 +147,14 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
         <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-xl mx-auto bg-white border border-slate-200 rounded-xl p-5 sm:p-6 md:p-10 relative overflow-visible shadow-xl text-left"
+            className="w-full max-w-xl mx-auto bg-white border border-slate-200 rounded-xl p-5 md:p-10 relative overflow-visible shadow-xl text-left"
         >
             <div className="absolute top-0 right-0 p-4 sm:p-6 flex items-center gap-2 opacity-30 select-none">
                 <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                 <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">{t.computation}</span>
             </div>
 
-            <div className="space-y-5 relative z-10 w-full">
+            <div className="space-y-4 relative z-10 w-full">
                 <div className="w-full">
                     <label className="divine-label">{t.name}</label>
                     <div className="relative group">
@@ -164,13 +173,13 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
 
                 <div className="w-full">
                     <label className="divine-label">{t.gender}</label>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2">
                         {['male', 'female', 'other'].map((g) => (
                             <button
                                 key={g}
                                 type="button"
                                 onClick={() => setFormData({ ...formData, gender: g })}
-                                className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold uppercase tracking-wide border transition-all ${formData.gender === g
+                                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide border transition-all ${formData.gender === g
                                     ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
                                     : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-white hover:border-indigo-200'
                                     }`}
@@ -184,7 +193,7 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                     </div>
                 </div>
 
-                <div className="space-y-5">
+                <div className="space-y-4">
                     <div className="w-full">
                         <label className="divine-label">{t.dob}</label>
                         <DivineDatePicker
@@ -266,20 +275,20 @@ export default function HoroscopeForm({ onCalculate, loading, language = 'en', i
                     whileTap={{ scale: 0.99 }}
                     disabled={loading || !formData.name || !formData.gender || !formData.dob || !formData.tob || !formData.pob || (!formData.lat && !formData.lon)}
                     onClick={() => onCalculate(formData)}
-                    className="divine-button w-full h-12 flex items-center justify-center gap-3 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="divine-button w-full h-11 flex items-center justify-center gap-3 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loading ? (
                         <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                     ) : (
                         <>
                             <Sparkles className="w-4 h-4" />
-                            <span className={`text-sm font-bold uppercase tracking-widest ${language === 'ta' ? 'font-tamil' : ''}`}>{t.calculate}</span>
+                            <span className={`text-xs font-bold uppercase tracking-widest ${language === 'ta' ? 'font-tamil' : ''}`}>{t.calculate}</span>
                         </>
                     )}
                 </motion.button>
             </div>
 
-            <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center opacity-30">
+            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center opacity-30">
                 <span className="text-[10px] font-bold tracking-[0.1em] text-slate-600 uppercase">{t.engine}</span>
                 <span className="text-[10px] font-bold tracking-[0.1em] text-slate-600 text-right">VERSION 2.4.0</span>
             </div>
