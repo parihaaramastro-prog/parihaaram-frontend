@@ -43,13 +43,29 @@ export const settingsService = {
 
     async updateSettings(settings: Partial<AppSettings>): Promise<void> {
         const supabase = createClient();
-        // Use UPDATE instead of UPSERT to avoid trying to write to the 'id' column
-        // This avoids the "cannot insert a non-DEFAULT value" error for Identity columns.
-        const { error } = await supabase
-            .from('app_settings')
-            .update(settings)
-            .eq('id', 1);
 
-        if (error) throw error;
+        // 1. Try to find an existing row
+        const { data: existing, error: fetchError } = await supabase
+            .from('app_settings')
+            .select('id')
+            .limit(1)
+            .maybeSingle();
+
+        if (fetchError) throw fetchError;
+
+        if (existing) {
+            // Update the found row
+            const { error } = await supabase
+                .from('app_settings')
+                .update(settings)
+                .eq('id', existing.id);
+            if (error) throw error;
+        } else {
+            // No row exists, insert a new one
+            const { error } = await supabase
+                .from('app_settings')
+                .insert([settings]);
+            if (error) throw error;
+        }
     }
 };
