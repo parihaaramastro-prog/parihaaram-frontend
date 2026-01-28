@@ -6,7 +6,7 @@ import {
     Users, Settings, ShieldCheck, Grid,
     Database, Activity, Search, Filter,
     ArrowUpRight, Loader2, UserPlus, UserCheck, CheckCircle2, Clock,
-    Mail, Shield, Trash2, MoreVertical, Info, AlertTriangle, X, MessageSquare, Briefcase, LogOut, Coins, Bot
+    Mail, Shield, Trash2, MoreVertical, Info, AlertTriangle, X, MessageSquare, Briefcase, LogOut, Coins, Bot, Sparkles
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -67,6 +67,7 @@ export default function AdminDashboard() {
     const [packCredits, setPackCredits] = useState(10);
     const [aiModel, setAiModel] = useState<string>('gpt-4o');
     const [systemPrompt, setSystemPrompt] = useState("");
+    const [masterPrompt, setMasterPrompt] = useState(""); // Master prompt to set the tone
     const [isPromptActive, setIsPromptActive] = useState(true);
     const [chatLogs, setChatLogs] = useState<any[]>([]);
     const [selectedLog, setSelectedLog] = useState<any | null>(null);
@@ -133,6 +134,7 @@ export default function AdminDashboard() {
             setPackCredits(s.pack_credits);
             if (s.ai_model) setAiModel(s.ai_model);
             if (s.system_prompt) setSystemPrompt(s.system_prompt);
+            if (s.master_prompt) setMasterPrompt(s.master_prompt);
             if (s.is_prompt_active !== undefined) setIsPromptActive(s.is_prompt_active);
             if (s.prompt_presets) setPresets(s.prompt_presets);
         }).catch(() => {
@@ -199,6 +201,20 @@ export default function AdminDashboard() {
             await settingsService.updateSettings({ is_prompt_active: newState });
         } catch (e: any) {
             alert("Settings Update Failed: " + e.message + "\n\nYou likely need to add 'is_prompt_active' column to your 'app_settings' table.");
+        }
+    };
+
+    const saveMasterPrompt = async () => {
+        try {
+            await settingsService.updateSettings({ master_prompt: masterPrompt });
+            alert("Master Prompt updated successfully. This will set the tone for all AI interactions.");
+        } catch (e: any) {
+            console.error("Save Master Prompt Error:", e);
+            if (e.message.includes("column")) {
+                alert("DATABASE SCHEMA UPDATE REQUIRED:\n\nRun this SQL in your Supabase SQL Editor:\n\nALTER TABLE app_settings ADD COLUMN IF NOT EXISTS master_prompt TEXT DEFAULT '';");
+            } else {
+                alert(`Failed to save master prompt: ${e.message}`);
+            }
         }
     };
 
@@ -820,67 +836,94 @@ export default function AdminDashboard() {
                         )}
 
                         {activeTab === 'ai-config' && (
-                            <motion.div key="ai-config" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-[calc(100vh-140px)] grid grid-cols-12 gap-6">
-                                <div className="col-span-8 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
-                                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                                        <div className="flex items-center gap-4">
-                                            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">System Prompt</h3>
-                                            <div className="flex gap-2">
-                                                {presets.map((p, i) => (
-                                                    <button
-                                                        key={i}
-                                                        onClick={() => loadPreset(p)}
-                                                        className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-2"
-                                                    >
-                                                        {p.name}
-                                                        <span onClick={(e) => { e.stopPropagation(); handleDeletePreset(i); }} className="hover:text-red-500">×</span>
+                            <motion.div key="ai-config" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-[calc(100vh-140px)] flex flex-col gap-6">
+                                {/* Master Prompt Section - Sets the Tone */}
+                                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-2xl shadow-lg flex flex-col overflow-hidden">
+                                    <div className="p-4 border-b border-indigo-200 bg-white/50 backdrop-blur-sm flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+                                                <Sparkles className="w-4 h-4 text-white" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-bold text-indigo-900 uppercase tracking-widest">Master Prompt</h3>
+                                                <p className="text-[10px] text-indigo-600 font-medium">Sets the tone for all AI interactions (cached on login)</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={saveMasterPrompt} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold uppercase tracking-widest shadow-md transition-all">
+                                            Save Master Prompt
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        value={masterPrompt}
+                                        onChange={e => setMasterPrompt(e.target.value)}
+                                        className="h-32 p-4 text-sm font-mono text-slate-800 resize-none outline-none leading-relaxed bg-white/70"
+                                        placeholder="Example: You are Parihaaram AI, a wise and compassionate Vedic astrology expert. Speak with warmth, clarity, and depth..."
+                                    />
+                                </div>
+
+                                {/* System Prompt Section */}
+                                <div className="flex-1 grid grid-cols-12 gap-6 min-h-0">
+                                    <div className="col-span-8 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
+                                        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                                            <div className="flex items-center gap-4">
+                                                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">System Prompt</h3>
+                                                <div className="flex gap-2">
+                                                    {presets.map((p, i) => (
+                                                        <button
+                                                            key={i}
+                                                            onClick={() => loadPreset(p)}
+                                                            className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-2"
+                                                        >
+                                                            {p.name}
+                                                            <span onClick={(e) => { e.stopPropagation(); handleDeletePreset(i); }} className="hover:text-red-500">×</span>
+                                                        </button>
+                                                    ))}
+                                                    <button onClick={() => setShowSavePreset(!showSavePreset)} className="p-1 text-indigo-600 hover:bg-indigo-50 rounded" title="Save current prompt as preset">
+                                                        {showSavePreset ? <X className="w-4 h-4" /> : <span className="text-xs font-bold flex items-center gap-1"><Grid className="w-3 h-3" /> Save Preset</span>}
                                                     </button>
-                                                ))}
-                                                <button onClick={() => setShowSavePreset(!showSavePreset)} className="p-1 text-indigo-600 hover:bg-indigo-50 rounded" title="Save current prompt as preset">
-                                                    {showSavePreset ? <X className="w-4 h-4" /> : <span className="text-xs font-bold flex items-center gap-1"><Grid className="w-3 h-3" /> Save Preset</span>}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {showSavePreset && (
+                                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                                                        <input
+                                                            value={newPresetName}
+                                                            onChange={e => setNewPresetName(e.target.value)}
+                                                            placeholder="Preset Name..."
+                                                            className="h-8 px-3 text-xs border border-slate-200 rounded-lg focus:border-indigo-500 outline-none"
+                                                        />
+                                                        <button onClick={handleSavePreset} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold">Save</button>
+                                                    </div>
+                                                )}
+                                                <button onClick={savePrompt} className="px-4 py-1.5 bg-slate-900 text-white rounded-md text-xs font-bold uppercase tracking-widest hover:bg-slate-800">
+                                                    Update Active Prompt
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            {showSavePreset && (
-                                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
-                                                    <input
-                                                        value={newPresetName}
-                                                        onChange={e => setNewPresetName(e.target.value)}
-                                                        placeholder="Preset Name..."
-                                                        className="h-8 px-3 text-xs border border-slate-200 rounded-lg focus:border-indigo-500 outline-none"
-                                                    />
-                                                    <button onClick={handleSavePreset} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold">Save</button>
-                                                </div>
-                                            )}
-                                            <button onClick={savePrompt} className="px-4 py-1.5 bg-slate-900 text-white rounded-md text-xs font-bold uppercase tracking-widest hover:bg-slate-800">
-                                                Update Active Prompt
-                                            </button>
+                                        <textarea
+                                            value={systemPrompt}
+                                            onChange={e => setSystemPrompt(e.target.value)}
+                                            className="flex-1 p-6 text-sm font-mono text-slate-800 resize-none outline-none leading-relaxed"
+                                            placeholder="Define AI persona..."
+                                        />
+                                    </div>
+                                    <div className="col-span-4 bg-slate-900 rounded-2xl shadow-sm flex flex-col overflow-hidden border border-slate-800">
+                                        <div className="p-3 border-b border-slate-800 bg-slate-900 flex justify-between items-center">
+                                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Logs</h3>
                                         </div>
-                                    </div>
-                                    <textarea
-                                        value={systemPrompt}
-                                        onChange={e => setSystemPrompt(e.target.value)}
-                                        className="flex-1 p-6 text-sm font-mono text-slate-800 resize-none outline-none leading-relaxed"
-                                        placeholder="Define AI persona..."
-                                    />
-                                </div>
-                                <div className="col-span-4 bg-slate-900 rounded-2xl shadow-sm flex flex-col overflow-hidden border border-slate-800">
-                                    <div className="p-3 border-b border-slate-800 bg-slate-900 flex justify-between items-center">
-                                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Logs</h3>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                                        {chatLogs.map(log => (
-                                            <div key={log.id} onClick={() => setSelectedLog(log)} className="p-3 rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 cursor-pointer transition-colors group">
-                                                <div className="flex justify-between items-center mb-1">
-                                                    <span className="text-[10px] font-bold text-indigo-400 uppercase truncate max-w-[120px]">
-                                                        {getUserName(log.user_id)}
-                                                    </span>
-                                                    <span className="text-[9px] font-mono text-slate-500">{new Date(log.created_at).toLocaleTimeString()}</span>
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                            {chatLogs.map(log => (
+                                                <div key={log.id} onClick={() => setSelectedLog(log)} className="p-3 rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 cursor-pointer transition-colors group">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="text-[10px] font-bold text-indigo-400 uppercase truncate max-w-[120px]">
+                                                            {getUserName(log.user_id)}
+                                                        </span>
+                                                        <span className="text-[9px] font-mono text-slate-500">{new Date(log.created_at).toLocaleTimeString()}</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-300 line-clamp-2 group-hover:text-white transition-colors">{log.user_message}</p>
                                                 </div>
-                                                <p className="text-[11px] text-slate-300 line-clamp-2 group-hover:text-white transition-colors">{log.user_message}</p>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             </motion.div>

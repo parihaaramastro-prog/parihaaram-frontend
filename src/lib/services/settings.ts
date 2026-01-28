@@ -9,6 +9,7 @@ export interface AppSettings {
     system_prompt?: string;
     is_prompt_active?: boolean;
     prompt_presets?: any[];
+    master_prompt?: string; // Master prompt to set the tone for all AI interactions
 }
 
 export const settingsService = {

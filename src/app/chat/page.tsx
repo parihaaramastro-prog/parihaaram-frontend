@@ -20,6 +20,8 @@ import ReactMarkdown from 'react-markdown';
 import { chatService, ChatSession, ChatMessage } from "@/lib/services/chat";
 import Footer from "@/components/Footer";
 import UserProfileDropdown from "@/components/UserProfileDropdown";
+import { masterPromptCache } from "@/lib/services/masterPromptCache";
+
 
 function ChatContent() {
     const router = useRouter();
@@ -49,6 +51,7 @@ function ChatContent() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'primary' | 'secondary'>('primary');
     const [isTyping, setIsTyping] = useState(false);
+    const [suggestionPrompts, setSuggestionPrompts] = useState<string[]>([]);
 
     // Credit State
     const [credits, setCredits] = useState<number | null>(null);
@@ -91,6 +94,12 @@ function ChatContent() {
             settingsService.getSettings().then(s => {
                 setPackConfig({ price: s.pack_price, credits: s.pack_credits });
                 setRazorpayEnabled(s.razorpay_enabled);
+
+                // Cache the master prompt to set the tone for all AI interactions
+                if (s.master_prompt) {
+                    masterPromptCache.set(s.master_prompt);
+                    console.log('[Master Prompt] Cached on login:', s.master_prompt.substring(0, 100) + '...');
+                }
             });
 
             // Credits
@@ -334,11 +343,32 @@ function ChatContent() {
 
 
     const handleProfileSelect = async (profile: SavedHoroscope) => {
-        if (!currentChatId || !userId) return;
+        if (!userId) return;
 
         const isPrimary = modalMode === 'primary';
 
         try {
+            // If no active chat, create one first
+            if (!currentChatId) {
+                const newSession = await chatService.createSession(userId, "New Session", profile.id);
+                setChats(prev => [newSession, ...prev]);
+                setCurrentChatId(newSession.id);
+                setPrimaryProfile(profile);
+
+                // Close modal
+                setIsModalOpen(false);
+
+                // Auto-trigger Life Prediction
+                const autoPrompt = `Analyze my chart (${profile.name}) and give me a relatable life prediction. Focus on my nature, current vibe, and what's coming up. End with a hook to ask more questions.`;
+
+                // Wait a bit for state to update, then send
+                setTimeout(() => {
+                    handleSend(autoPrompt, true, { p1: profile }, newSession.id);
+                }, 100);
+
+                return;
+            }
+
             if (isPrimary) {
                 await chatService.updateSessionProfiles(currentChatId, profile.id, undefined);
                 setPrimaryProfile(profile);
@@ -413,8 +443,16 @@ function ChatContent() {
                 secondaryProfile: effectiveSecondary || undefined
             }, messages.filter(m => m.role !== 'system')); // Pass users/ai history only
 
+
             // Save AI Message
+            console.log('[AI Response] Full reply length:', response.reply.length);
+            console.log('[AI Response] First 500 chars:', response.reply.substring(0, 500));
+            console.log('[AI Response] Last 500 chars:', response.reply.substring(Math.max(0, response.reply.length - 500)));
+
             const aiMsg = await chatService.addMessage(targetChatId, 'ai', response.reply);
+
+            console.log('[Saved Message] Content length:', aiMsg.content.length);
+            console.log('[Saved Message] Matches original?', aiMsg.content === response.reply);
 
             // Update State
             setMessages(prev => prev.map(m => m.id === tempId ? { ...userMsg, id: 'saved-' + tempId } : m).concat(aiMsg));
@@ -430,6 +468,16 @@ function ChatContent() {
 
             if (response.remainingCredits !== undefined) {
                 setCredits(response.remainingCredits);
+            }
+
+            // Set contextual suggestion prompts based on the response
+            if (!hidden) {
+                const suggestions = [
+                    "Explain this in detail",
+                    "What remedies can help?",
+                    "Tell me more about this"
+                ];
+                setSuggestionPrompts(suggestions);
             }
 
         } catch (error: any) {
@@ -969,21 +1017,49 @@ function ChatContent() {
                     {primaryProfile ? (
                         <div className="px-4 pb-4 pt-2 shrink-0 max-w-4xl mx-auto w-full z-10 relative">
 
-                            {/* Prompt Pills (Floating above input) */}
+                            {/* Suggestion Prompts or Preset Pills (Floating above input) */}
                             {!isTyping && (
                                 <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
-                                    {presets.slice(0, 3).map((p, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => p.action ? p.action() : handleSend(p.query)}
-                                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-indigo-700 border border-indigo-100 hover:border-indigo-300 rounded-full text-xs font-bold shadow-sm transition-all whitespace-nowrap backdrop-blur-sm"
-                                        >
-                                            {p.icon}
-                                            <span>{p.label}</span>
-                                        </button>
-                                    ))}
+                                    {suggestionPrompts.length > 0 ? (
+                                        // Show contextual suggestions after AI response
+                                        <>
+                                            {suggestionPrompts.map((suggestion, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => {
+                                                        handleSend(suggestion);
+                                                        setSuggestionPrompts([]); // Clear after use
+                                                    }}
+                                                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded-full text-xs font-bold shadow-sm transition-all whitespace-nowrap"
+                                                >
+                                                    <Sparkles className="w-3 h-3" />
+                                                    <span>{suggestion}</span>
+                                                </button>
+                                            ))}
+                                            <button
+                                                onClick={() => setSuggestionPrompts([])}
+                                                className="shrink-0 p-1.5 text-slate-400 hover:text-slate-600 transition-colors"
+                                                title="Clear suggestions"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        // Show preset pills when no suggestions
+                                        presets.slice(0, 3).map((p, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => p.action ? p.action() : handleSend(p.query)}
+                                                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-indigo-700 border border-indigo-100 hover:border-indigo-300 rounded-full text-xs font-bold shadow-sm transition-all whitespace-nowrap backdrop-blur-sm"
+                                            >
+                                                {p.icon}
+                                                <span>{p.label}</span>
+                                            </button>
+                                        ))
+                                    )}
                                 </div>
                             )}
+
 
                             <div className="relative bg-white rounded-[2rem] p-2 pr-2 flex items-end gap-2 shadow-2xl shadow-indigo-900/5 ring-1 ring-slate-900/5 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
                                 <textarea

@@ -140,22 +140,48 @@ export async function POST(req: NextRequest) {
 
         let systemPrompt = "";
 
+        // MASTER PROMPT: Only apply for the FIRST message (initial life prediction)
+        // Check if this is the first message in the conversation
+        const isFirstMessage = messages.length === 0 || (messages.length === 1 && messages[0].role === 'user');
+        const masterPrompt = settings?.master_prompt || "";
+
+        if (masterPrompt && isFirstMessage) {
+            systemPrompt = masterPrompt + "\n\n";
+            console.log('[Master Prompt] Applied for initial life prediction');
+        } else if (!isFirstMessage) {
+            console.log('[Master Prompt] Skipped - not first message');
+        }
+
         if (isPromptActive) {
-            systemPrompt = settings?.system_prompt || defaultPrompt;
+            const regularPrompt = settings?.system_prompt || defaultPrompt;
 
             // Allow dynamic date injection if the prompt from DB has the placeholder
-            systemPrompt = systemPrompt.replace("${currentDate}", currentDate);
+            let processedPrompt = regularPrompt.replace("${currentDate}", currentDate);
 
-            if (!systemPrompt.includes("Current Date:")) {
-                systemPrompt = `Current Date: ${currentDate}.\n\n` + systemPrompt;
+            if (!processedPrompt.includes("Current Date:")) {
+                processedPrompt = `Current Date: ${currentDate}.\n\n` + processedPrompt;
             }
+
+            systemPrompt += processedPrompt;
         } else {
             // Minimal prompt: RAW MODE
             // "no prompt just data sending to ai model but in that if user asks anything about what ai you are please dont tell"
-            systemPrompt = `Current Date: ${currentDate}.
+            systemPrompt += `Current Date: ${currentDate}.
 You are a helpful assistant.
 PRIVACY CHECK: If the user asks about your underlying AI model (e.g. GPT, Gemini, Cluade) or your identity, do NOT reveal the model name. Simply state you are Parihaaram AI.
 Otherwise, answer the user's question directly based on the provided context.`;
+        }
+
+        // Add dynamic response length instruction for non-initial messages
+        if (!isFirstMessage) {
+            const lastMessage = messages[messages.length - 1]?.content || "";
+            const isDetailRequest = lastMessage.toLowerCase().includes("detail") ||
+                lastMessage.toLowerCase().includes("explain more") ||
+                lastMessage.toLowerCase().includes("elaborate");
+
+            if (!isDetailRequest) {
+                systemPrompt += `\n\nIMPORTANT: Keep your response CONCISE and to the point (around 5 lines or 100 words). Be clear and direct. The user can ask for more details if needed.`;
+            }
         }
 
         if (context) {
@@ -333,6 +359,15 @@ Note: Precise chart data unavailable.
             lastMessage.toLowerCase().startsWith("can i");
         const temperature = isDecisionQuestion ? 0.4 : 0.7;
 
+        // Dynamic token limits based on message type
+        const isDetailRequest = lastMessage.toLowerCase().includes("detail") ||
+            lastMessage.toLowerCase().includes("explain more") ||
+            lastMessage.toLowerCase().includes("elaborate") ||
+            lastMessage.toLowerCase().includes("in depth");
+
+        const maxTokens = isFirstMessage ? 800 : (isDetailRequest ? 600 : 300); // Initial: 800, Detail: 600, General: 300
+        console.log(`[Token Limit] ${maxTokens} tokens (${isFirstMessage ? 'Initial Prediction' : isDetailRequest ? 'Detail Request' : 'Concise Response'})`);
+
         let reply = "";
 
         console.log(`--- Using Model: ${selectedModel.toUpperCase()} ---`);
@@ -356,7 +391,7 @@ Note: Precise chart data unavailable.
                     config: {
                         systemInstruction: systemPrompt,
                         temperature: temperature,
-                        maxOutputTokens: 4000,
+                        maxOutputTokens: maxTokens,
                     },
                 });
 
@@ -375,7 +410,7 @@ Note: Precise chart data unavailable.
                     ...messages
                 ],
                 temperature: temperature,
-                max_tokens: 4000,
+                max_tokens: maxTokens,
             });
 
             reply = completion.choices[0].message.content || "";
@@ -383,6 +418,7 @@ Note: Precise chart data unavailable.
 
         console.log("LLM Reply:", reply);
         console.log("------------------------------------------------------------------");
+
 
         // Log to DB (Fire and forget, don't await blocking)
         supabase.from('chat_logs').insert({
