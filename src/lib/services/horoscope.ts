@@ -22,7 +22,7 @@ export const horoscopeService = {
 
         if (!user) throw new Error("Please log in to save horoscopes.");
 
-        const { error } = await supabase
+        const { data: savedData, error } = await supabase
             .from('horoscopes')
             .insert({
                 user_id: user.id,
@@ -34,10 +34,13 @@ export const horoscopeService = {
                 lat: data.lat,
                 lon: data.lon,
                 chart_data: data.chart_data
-            });
+            })
+            .select()
+            .single();
 
         if (error) throw error;
         profileCache = null; // Invalidate cache
+        return savedData as SavedHoroscope;
     },
 
     async updateHoroscope(id: string, updates: Partial<SavedHoroscope>) {

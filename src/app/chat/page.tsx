@@ -174,16 +174,22 @@ function ChatContent() {
     }, [currentChatId, userId, savedProfiles]); // Re-run if profiles load late
 
     const [validatingVibeCheck, setValidatingVibeCheck] = useState(false);
+    const [autoStartProcessed, setAutoStartProcessed] = useState(false);
 
     // Auto-Start Check (New User from Landing / VibeCheck)
     useEffect(() => {
         const mode = searchParams.get('new');
+        const profileIdFromUrl = searchParams.get('profileId');
+
+        // Prevent re-running after we've already processed
+        if (autoStartProcessed) return;
 
         if (mode === 'vibecheck' && userId && savedProfiles.length >= 2) {
             // Vibe Check Flow: Latest 2 profiles (Partner is usually latest [0], You are [1] or vice-versa depending on save order)
 
             const initVibeCheck = async () => {
                 setValidatingVibeCheck(true);
+                setAutoStartProcessed(true);
                 try {
                     let partner = savedProfiles[0];
                     let you = savedProfiles[1];
@@ -240,15 +246,30 @@ function ChatContent() {
             initVibeCheck();
 
         } else if (mode === 'true' && userId && savedProfiles.length > 0) {
-            // Standard Flow
-            const hasRecentEmptyChat = chats.length > 0 && chats[0].title === "New Session" && (new Date().getTime() - new Date(chats[0].created_at).getTime() < 10000);
-            if (!hasRecentEmptyChat) {
-                const latest = savedProfiles[0];
-                createNewChatWithProfile(latest);
-                router.replace('/chat');
+            // Standard Flow from AI Landing Page
+            setAutoStartProcessed(true);
+
+            // Find the specific profile if provided, otherwise use the latest
+            let targetProfile: SavedHoroscope | undefined;
+            if (profileIdFromUrl) {
+                targetProfile = savedProfiles.find(p => p.id === profileIdFromUrl);
             }
+            if (!targetProfile) {
+                targetProfile = savedProfiles[0]; // Fallback to latest
+            }
+
+            // Check for recent session to avoid dupes
+            const hasRecentEmptyChat = chats.length > 0 && chats[0].title === "New Session" && (new Date().getTime() - new Date(chats[0].created_at).getTime() < 10000);
+
+            if (!hasRecentEmptyChat && targetProfile) {
+                console.log('[Auto-Start] Creating chat with profile:', targetProfile.name);
+                createNewChatWithProfile(targetProfile);
+            }
+
+            // Clear the params
+            router.replace('/chat');
         }
-    }, [searchParams, userId, savedProfiles]);
+    }, [searchParams, userId, savedProfiles, autoStartProcessed, chats]);
 
     const createVibeCheckSession = async (p1: SavedHoroscope, p2: SavedHoroscope) => {
         if (!userId) return;
@@ -276,9 +297,16 @@ function ChatContent() {
             const newSession = await chatService.createSession(userId, "New Session", profile.id);
             setChats(prev => [newSession, ...prev]);
             setCurrentChatId(newSession.id);
-            // Add system/greeting message
-            await chatService.addMessage(newSession.id, 'ai', "Hello! I am Parihaaram AI. I see you've selected **" + profile.name + "**. How can I help you regarding this chart today?");
-            // Refresh logic handled by setCurrentChatId -> useEffect
+            setPrimaryProfile(profile);
+
+            // Auto-trigger AI life prediction for seamless onboarding
+            const autoPrompt = `Analyze my chart (${profile.name}) and give me a relatable life prediction. Focus on my nature, current vibe, and what's coming up. End with a hook to ask more questions.`;
+
+            // Wait a small delay for state to settle, then trigger the AI
+            setTimeout(() => {
+                handleSend(autoPrompt, true, { p1: profile }, newSession.id);
+            }, 200);
+
         } catch (e) {
             console.error(e);
         }
@@ -515,7 +543,7 @@ function ChatContent() {
     if (!mounted) return null;
 
     return (
-        <main className="fixed inset-x-0 bottom-0 top-[120px] md:top-[140px] bg-slate-50 flex flex-col items-center z-0 md:px-4 h-[calc(100dvh-120px)] md:h-auto">
+        <main className="fixed inset-x-0 bottom-0 top-[56px] bg-slate-50 flex flex-col items-center z-0 h-[calc(100dvh-56px)]">
 
             <ProfileSelectionModal
                 isOpen={isModalOpen}
@@ -764,29 +792,29 @@ function ChatContent() {
                 {/* Main Chat Area */}
                 <div className="flex-1 flex flex-col relative bg-white w-full h-full">
 
-                    {/* Header */}
-                    <header className="absolute top-0 inset-x-0 z-20 flex flex-col bg-white/70 backdrop-blur-md border-b border-white/20 shadow-sm transition-all duration-300">
-                        <div className="px-4 py-3 md:px-6 md:py-4 flex items-center justify-between">
+                    {/* Header - Clean and Compact */}
+                    <header className="absolute top-0 inset-x-0 z-20 flex flex-col bg-white/90 backdrop-blur-lg border-b border-slate-100 shadow-sm">
+                        <div className="px-4 py-2.5 md:px-5 md:py-3 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                                    className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-50 text-slate-500 transition-colors"
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
                                 >
                                     <Sidebar className="w-5 h-5" />
                                 </button>
                                 <div className="flex flex-col">
-                                    <span className="font-bold text-slate-900 text-sm md:text-base leading-none">AI Astrologer</span>
+                                    <span className="font-bold text-slate-900 text-sm leading-none">AI Astrologer</span>
                                     <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Online
                                     </span>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="flex items-center gap-2">
                                 {/* Credit Pill */}
                                 <button
                                     onClick={() => setShowPayModal(true)}
-                                    className="flex items-center gap-1.5 bg-amber-50/50 hover:bg-amber-100/80 text-amber-700 border border-amber-200/50 px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-colors backdrop-blur-sm shadow-sm"
+                                    className="flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm"
                                 >
                                     <Coins className="w-3.5 h-3.5" />
                                     <span>
@@ -799,7 +827,7 @@ function ChatContent() {
 
                                 <button
                                     onClick={() => createNewChat()}
-                                    className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-slate-900 hover:bg-slate-800 text-white transition-colors shadow-md hover:shadow-lg backdrop-blur-sm"
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-900 hover:bg-indigo-600 text-white transition-all shadow-lg hover:shadow-indigo-500/25 hover:scale-105 active:scale-95"
                                     title="New Chat"
                                 >
                                     <Plus className="w-4 h-4" />
@@ -807,45 +835,45 @@ function ChatContent() {
 
                                 <Link
                                     href="/dashboard"
-                                    className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors border border-slate-200 shadow-sm"
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors border border-slate-200 shadow-sm"
                                     title="Exit Chat"
                                 >
-                                    <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5" />
+                                    <LogOut className="w-4 h-4" />
                                 </Link>
                             </div>
                         </div>
 
-                        {/* Active Context Bar - Now slimmer and bottom-bordered */}
-                        <div className="px-4 md:px-6 pb-2 pt-0 flex overflow-x-auto gap-2 items-center flex-nowrap scrollbar-hide">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1 shrink-0 hidden xs:block">Context:</span>
+                        {/* Active Context Bar */}
+                        <div className="px-4 md:px-5 pb-2.5 flex overflow-x-auto gap-2 items-center flex-nowrap scrollbar-hide">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1 shrink-0">Context:</span>
 
                             <button
                                 onClick={() => openProfileSelector('primary')}
-                                className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-all ${primaryProfile ? 'bg-indigo-50/80 border-indigo-200 text-indigo-900' : 'bg-white/50 border-dashed border-slate-300 text-slate-400 hover:border-indigo-300 hover:text-indigo-600'}`}
+                                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${primaryProfile ? 'bg-indigo-50 border-indigo-200 text-indigo-800 shadow-sm' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-600'}`}
                             >
-                                <User className="w-3 h-3" />
+                                <User className="w-3.5 h-3.5" />
                                 {primaryProfile ? primaryProfile.name : "Select Profile"}
                             </button>
 
                             {primaryProfile && (
                                 <>
-                                    <span className="text-slate-300 text-[10px] shrink-0">&</span>
+                                    <span className="text-slate-300 text-xs shrink-0">+</span>
                                     {secondaryProfile ? (
                                         <button
                                             onClick={() => openProfileSelector('secondary')}
-                                            className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border bg-pink-50/80 border-pink-200 text-pink-900 transition-all"
+                                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border bg-pink-50 border-pink-200 text-pink-800 shadow-sm transition-all"
                                         >
-                                            <Users className="w-3 h-3" />
+                                            <Users className="w-3.5 h-3.5" />
                                             {secondaryProfile.name}
-                                            <X className="w-3 h-3 ml-1 text-pink-400 hover:text-pink-700" onClick={(e) => { e.stopPropagation(); setSecondaryProfile(null); }} />
+                                            <X className="w-3 h-3 ml-0.5 text-pink-400 hover:text-pink-700 cursor-pointer" onClick={(e) => { e.stopPropagation(); setSecondaryProfile(null); }} />
                                         </button>
                                     ) : (
                                         <button
                                             onClick={() => openProfileSelector('secondary')}
-                                            className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center border border-dashed border-slate-300 text-slate-400 hover:border-pink-300 hover:text-pink-600 hover:bg-pink-50 transition-all"
+                                            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 border-dashed border-slate-300 text-slate-400 hover:border-pink-400 hover:text-pink-500 hover:bg-pink-50 transition-all"
                                             title="Add Partner"
                                         >
-                                            <Plus className="w-3.5 h-3.5" />
+                                            <Plus className="w-4 h-4" />
                                         </button>
                                     )}
                                 </>
@@ -853,8 +881,8 @@ function ChatContent() {
                         </div>
                     </header>
 
-                    {/* Messages Area - Added paddingTop to account for fixed header */}
-                    <div className={`flex-1 px-4 sm:px-8 pt-32 pb-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-100 relative ${credits !== null && credits <= 0 ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+                    {/* Messages Area - Clean spacing */}
+                    <div className={`flex-1 px-4 md:px-6 lg:px-8 pt-24 md:pt-28 pb-4 space-y-5 scrollbar-thin scrollbar-thumb-slate-200 relative ${credits !== null && credits <= 0 ? 'overflow-hidden' : 'overflow-y-auto'}`}>
 
                         {/* LOADING STATE - INITIAL */}
                         {(credits === null) && (
@@ -909,22 +937,22 @@ function ChatContent() {
                         {credits !== null && credits > 0 && (
                             <>
                                 {visibleMessages.length === 0 && !isTyping ? (
-                                    <div className="h-full flex flex-col justify-center items-center pb-20 text-center max-w-lg mx-auto px-4">
+                                    <div className="h-full flex flex-col justify-center items-center pb-16 text-center max-w-lg mx-auto px-4">
                                         {!primaryProfile ? (
                                             // STATE 1: No Profile Selected
-                                            <div className="animate-in fade-in zoom-in duration-500 slides-in-from-bottom-4">
-                                                <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+                                            <div className="animate-in fade-in zoom-in duration-500 slide-in-from-bottom-4">
+                                                <div className="w-20 h-20 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-100">
                                                     <User className="w-10 h-10 text-indigo-600" />
                                                 </div>
-                                                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-3">
+                                                <h1 className="text-2xl font-bold text-slate-900 mb-3">
                                                     Who is this reading for?
                                                 </h1>
-                                                <p className="text-slate-500 text-sm sm:text-base mb-8 max-w-xs mx-auto leading-relaxed">
+                                                <p className="text-slate-500 text-sm mb-6 max-w-xs mx-auto leading-relaxed">
                                                     Please select a birth profile to enable your personalized AI astrologer.
                                                 </p>
                                                 <button
                                                     onClick={() => openProfileSelector('primary')}
-                                                    className="w-full sm:w-auto px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold uppercase tracking-wider shadow-lg shadow-indigo-500/30 transition-all hover:scale-105 active:scale-95"
+                                                    className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-xl text-sm font-bold uppercase tracking-wider shadow-xl shadow-indigo-500/30 transition-all hover:scale-105 active:scale-95"
                                                 >
                                                     Select Profile
                                                 </button>
@@ -932,28 +960,28 @@ function ChatContent() {
                                         ) : (
                                             // STATE 2: Profile Selected, Ready to Chat
                                             <div className="animate-in fade-in zoom-in duration-500">
-                                                <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                                <div className="w-16 h-16 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-indigo-100">
                                                     <Sparkles className="w-8 h-8 text-indigo-600" />
                                                 </div>
-                                                <h1 className="text-2xl sm:text-3xl font-medium text-slate-900 tracking-tight leading-tight mb-2">
+                                                <h1 className="text-xl font-medium text-slate-900 tracking-tight leading-tight mb-2">
                                                     Ask about <span className="font-bold text-indigo-600">{primaryProfile.name}</span>
                                                     {secondaryProfile && <span className="font-bold text-pink-600"> & {secondaryProfile.name}</span>}
                                                 </h1>
-                                                <p className="text-slate-500 text-sm mb-8">
-                                                    Your AI astrologer is ready. Select a topic to start (Uses Credits):
+                                                <p className="text-slate-500 text-sm mb-5">
+                                                    Your AI astrologer is ready. Select a topic:
                                                 </p>
 
-                                                <div className="grid grid-cols-1 gap-3 w-full text-left">
+                                                <div className="grid grid-cols-2 gap-3 w-full text-left">
                                                     {presets.map((p, i) => (
                                                         <button
                                                             key={i}
                                                             onClick={() => p.action ? p.action() : handleSend(p.query)}
-                                                            className="flex items-center gap-4 p-4 bg-white border border-slate-200 hover:border-indigo-500 hover:ring-1 hover:ring-indigo-500/20 rounded-xl transition-all group active:scale-[0.98]"
+                                                            className="flex items-center gap-3 p-3.5 bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-lg hover:shadow-indigo-100 rounded-xl transition-all group active:scale-[0.98]"
                                                         >
-                                                            <div className="w-10 h-10 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                                            <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-indigo-500 group-hover:to-purple-500 group-hover:text-white transition-all shrink-0">
                                                                 {p.icon}
                                                             </div>
-                                                            <span className="text-sm font-bold text-slate-700 group-hover:text-slate-900">{p.label}</span>
+                                                            <span className="text-sm font-semibold text-slate-700 group-hover:text-slate-900">{p.label}</span>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -966,25 +994,26 @@ function ChatContent() {
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             key={msg.id || i}
-                                            className={`flex gap-3 sm:gap-4 max-w-[90%] sm:max-w-2xl ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
+                                            className={`flex gap-3 max-w-3xl ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
                                         >
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 ${msg.role === 'ai' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-600'}`}>
+                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-1 shadow-sm ${msg.role === 'ai' ? 'bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-600' : 'bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600'}`}>
                                                 {msg.role === 'ai' ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
                                             </div>
 
-                                            <div className="flex flex-col gap-2">
+                                            <div className="flex flex-col gap-2 min-w-0">
                                                 <div
-                                                    className={`p-4 sm:p-5 rounded-3xl text-sm sm:text-[15px] leading-relaxed shadow-sm ${msg.role === 'user'
-                                                        ? 'bg-indigo-600 text-white rounded-tr-sm font-sans'
-                                                        : 'bg-white border border-slate-200 text-slate-700 rounded-tl-sm shadow-sm'
+                                                    className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
+                                                        ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-tr-md shadow-lg shadow-indigo-500/20'
+                                                        : 'bg-white border border-slate-100 text-slate-700 rounded-tl-md shadow-md'
                                                         }`}
                                                 >
                                                     <ReactMarkdown
                                                         components={{
                                                             strong: ({ node, ...props }) => <span className="font-bold" {...props} />,
-                                                            ul: ({ node, ...props }) => <ul className="list-disc list-outside ml-4 space-y-1" {...props} />,
-                                                            ol: ({ node, ...props }) => <ol className="list-decimal list-outside ml-4 space-y-1" {...props} />,
-                                                            p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />
+                                                            ul: ({ node, ...props }) => <ul className="list-disc list-outside ml-4 space-y-1 my-2" {...props} />,
+                                                            ol: ({ node, ...props }) => <ol className="list-decimal list-outside ml-4 space-y-1 my-2" {...props} />,
+                                                            p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                                            li: ({ node, ...props }) => <li className="leading-relaxed" {...props} />
                                                         }}
                                                     >
                                                         {msg.content}
@@ -1013,11 +1042,11 @@ function ChatContent() {
                         )}
                     </div>
 
-                    {/* Input Area - Floating Style */}
+                    {/* Input Area - Premium Design */}
                     {primaryProfile ? (
-                        <div className="px-4 pb-4 pt-2 shrink-0 max-w-4xl mx-auto w-full z-10 relative">
+                        <div className="px-4 md:px-6 pb-4 pt-2 shrink-0 max-w-4xl mx-auto w-full z-10 relative">
 
-                            {/* Suggestion Prompts or Preset Pills (Floating above input) */}
+                            {/* Suggestion Prompts or Preset Pills */}
                             {!isTyping && (
                                 <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
                                     {suggestionPrompts.length > 0 ? (
@@ -1030,7 +1059,7 @@ function ChatContent() {
                                                         handleSend(suggestion);
                                                         setSuggestionPrompts([]); // Clear after use
                                                     }}
-                                                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded-full text-xs font-bold shadow-sm transition-all whitespace-nowrap"
+                                                    className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 text-indigo-700 border border-indigo-200 hover:border-indigo-300 rounded-full text-xs font-bold shadow-sm transition-all whitespace-nowrap"
                                                 >
                                                     <Sparkles className="w-3 h-3" />
                                                     <span>{suggestion}</span>
@@ -1041,7 +1070,7 @@ function ChatContent() {
                                                 className="shrink-0 p-1.5 text-slate-400 hover:text-slate-600 transition-colors"
                                                 title="Clear suggestions"
                                             >
-                                                <X className="w-3.5 h-3.5" />
+                                                <X className="w-4 h-4" />
                                             </button>
                                         </>
                                     ) : (
@@ -1050,7 +1079,7 @@ function ChatContent() {
                                             <button
                                                 key={i}
                                                 onClick={() => p.action ? p.action() : handleSend(p.query)}
-                                                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-indigo-700 border border-indigo-100 hover:border-indigo-300 rounded-full text-xs font-bold shadow-sm transition-all whitespace-nowrap backdrop-blur-sm"
+                                                className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-indigo-50 text-indigo-700 border border-slate-200 hover:border-indigo-300 rounded-full text-xs font-bold shadow-sm transition-all whitespace-nowrap"
                                             >
                                                 {p.icon}
                                                 <span>{p.label}</span>
@@ -1061,12 +1090,12 @@ function ChatContent() {
                             )}
 
 
-                            <div className="relative bg-white rounded-[2rem] p-2 pr-2 flex items-end gap-2 shadow-2xl shadow-indigo-900/5 ring-1 ring-slate-900/5 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+                            <div className="relative bg-white rounded-2xl p-2 flex items-end gap-2 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-indigo-500/30 transition-all">
                                 <textarea
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     placeholder={`Ask about ${primaryProfile.name}'s chart...`}
-                                    className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm sm:text-base text-slate-900 placeholder:text-slate-400 min-h-[48px] max-h-[120px] py-3.5 px-4 resize-none caret-indigo-600 font-sans"
+                                    className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm text-slate-900 placeholder:text-slate-400 min-h-[44px] max-h-[120px] py-3 px-3 resize-none caret-indigo-600 font-sans"
                                     rows={1}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -1079,12 +1108,12 @@ function ChatContent() {
                                 <button
                                     onClick={() => handleSend()}
                                     disabled={!input.trim() || isTyping}
-                                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-900 hover:bg-indigo-600 flex items-center justify-center text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-110 active:scale-95 mb-1 shadow-lg shadow-slate-900/20"
+                                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 flex items-center justify-center text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 mb-0.5 shadow-lg shadow-indigo-500/30"
                                 >
-                                    <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
+                                    <ArrowUp className="w-5 h-5 stroke-[2.5]" />
                                 </button>
                             </div>
-                            <p className="text-center text-[9px] sm:text-[10px] text-slate-300 mt-2 font-medium tracking-wide">
+                            <p className="text-center text-[10px] text-slate-400 mt-2 font-medium tracking-wide">
                                 AI Astrology predictions are for guidance only.
                             </p>
                         </div>

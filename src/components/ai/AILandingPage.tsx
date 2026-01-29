@@ -141,9 +141,10 @@ export default function AIAstrologerLanding() {
         });
 
         // 2. Create Saved Horoscope (so it appears in chat selector)
+        let savedProfileId: string | null = null;
         if (data.lat && data.lon) {
             try {
-                await horoscopeService.saveHoroscope({
+                const savedProfile = await horoscopeService.saveHoroscope({
                     name: data.name,
                     dob: data.dob,
                     tob: data.tob,
@@ -152,13 +153,19 @@ export default function AIAstrologerLanding() {
                     lon: data.lon,
                     gender: 'male' // Default for landing page quick capture
                 });
+                savedProfileId = savedProfile?.id || null;
             } catch (e) {
                 console.warn("Could not save horoscope entry:", e);
                 // Proceed anyway, profile is updated
             }
         }
 
-        router.push('/chat?new=true');
+        // Navigate to chat with profile ID if available
+        const params = new URLSearchParams({ new: 'true' });
+        if (savedProfileId) {
+            params.set('profileId', savedProfileId);
+        }
+        router.push(`/chat?${params.toString()}`);
     };
 
     const handleStart = async () => {

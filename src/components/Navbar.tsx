@@ -108,15 +108,22 @@ export default function Navbar() {
 
     const currentLinks = !user ? navLinks.guest : role === 'admin' ? navLinks.admin : role === 'astrologer' ? navLinks.astrologer : navLinks.customer;
 
-    // Hide navbar on astrologer and admin pages
+    // Hide navbar ONLY on astrologer and admin pages (Show on chat now)
     if (pathname?.startsWith('/astrologer') || pathname?.startsWith('/admin')) {
         return null;
     }
 
+    // Special "Slim Mode" for Chat Page to maximize screen real estate
+    const isChatPage = pathname?.startsWith('/chat');
+
     return (
-        <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isScrolled ? 'py-2 md:py-4' : 'py-4 md:py-8'}`}>
-            <div className="max-w-[1400px] mx-auto px-4 md:px-6">
-                <div className={`relative px-4 md:px-8 h-18 rounded-2xl md:rounded-[2rem] border transition-all duration-700 flex items-center justify-between ${isScrolled ? 'bg-slate-50/90 backdrop-blur-2xl border-indigo-200/50 shadow-2xl shadow-indigo-500/10' : 'bg-slate-50/70 backdrop-blur-xl border-white/40 shadow-lg shadow-indigo-500/5'}`}>
+        <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${isChatPage ? 'py-0' : isScrolled ? 'py-2 md:py-4' : 'py-4 md:py-8'}`}>
+            <div className={`mx-auto transition-all duration-500 ${isChatPage ? 'w-full px-0' : 'max-w-[1400px] px-4 md:px-6'}`}>
+                <div className={`relative flex items-center justify-between transition-all duration-700 
+                    ${isChatPage
+                        ? 'h-14 px-4 border-b bg-white/80 backdrop-blur-md border-slate-200/50 rounded-none shadow-sm'
+                        : `px-4 md:px-8 h-18 rounded-2xl md:rounded-[2rem] border ${isScrolled ? 'bg-slate-50/90 backdrop-blur-2xl border-indigo-200/50 shadow-2xl shadow-indigo-500/10' : 'bg-slate-50/70 backdrop-blur-xl border-white/40 shadow-lg shadow-indigo-500/5'}`
+                    }`}>
 
                     {/* Brand */}
                     <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2 group">

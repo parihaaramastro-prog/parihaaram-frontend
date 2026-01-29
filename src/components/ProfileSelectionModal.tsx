@@ -59,7 +59,7 @@ export default function ProfileSelectionModal({ isOpen, onClose, onSelect, title
 
                     <div className="mt-8 pt-6 border-t border-dashed border-slate-200 text-center">
                         <Link
-                            href="/dashboard"
+                            href="/manual-entry"
                             className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-700 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-colors"
                         >
                             <Plus className="w-4 h-4" />

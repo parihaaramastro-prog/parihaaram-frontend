@@ -172,17 +172,7 @@ PRIVACY CHECK: If the user asks about your underlying AI model (e.g. GPT, Gemini
 Otherwise, answer the user's question directly based on the provided context.`;
         }
 
-        // Add dynamic response length instruction for non-initial messages
-        if (!isFirstMessage) {
-            const lastMessage = messages[messages.length - 1]?.content || "";
-            const isDetailRequest = lastMessage.toLowerCase().includes("detail") ||
-                lastMessage.toLowerCase().includes("explain more") ||
-                lastMessage.toLowerCase().includes("elaborate");
-
-            if (!isDetailRequest) {
-                systemPrompt += `\n\nIMPORTANT: Keep your response CONCISE and to the point (around 5 lines or 100 words). Be clear and direct. The user can ask for more details if needed.`;
-            }
-        }
+        // (Previous instructions removed to use global Interaction Guidelines at the end)
 
         if (context) {
             const { primaryProfile, secondaryProfile } = context;
@@ -359,14 +349,17 @@ Note: Precise chart data unavailable.
             lastMessage.toLowerCase().startsWith("can i");
         const temperature = isDecisionQuestion ? 0.4 : 0.7;
 
-        // Dynamic token limits based on message type
-        const isDetailRequest = lastMessage.toLowerCase().includes("detail") ||
-            lastMessage.toLowerCase().includes("explain more") ||
-            lastMessage.toLowerCase().includes("elaborate") ||
-            lastMessage.toLowerCase().includes("in depth");
+        // Standardized token limit to PREVENT CUTOFFS while prompt controls brevity
+        const maxTokens = 1500;
+        console.log(`[Token Limit] Standardized to ${maxTokens} to ensure complete responses`);
 
-        const maxTokens = isFirstMessage ? 800 : (isDetailRequest ? 600 : 300); // Initial: 800, Detail: 600, General: 300
-        console.log(`[Token Limit] ${maxTokens} tokens (${isFirstMessage ? 'Initial Prediction' : isDetailRequest ? 'Detail Request' : 'Concise Response'})`);
+        // Add specific interaction style instructions
+        systemPrompt += `\n\nINTERACTION GUIDELINES:
+1. NO CUTOFFS: Ensure your response is complete.
+2. CONCISE & STANDARD: Keep answers short and high-quality. Focus on the core message.
+3. NO DEEP IMPLICATIONS: Avoid complex technical jargon or deep astrological theory unless explicitly asked. Focus on practical guidance.
+4. ENGAGE THE USER: **CRITICAL**: END every response with a short, thought-provoking follow-up question related to their chart or life to encourage them to ask more. Example: "Would you like to know how this affects your career specifically?"
+5. CONSULTATION HANDOFF: If the user asks for highly specific event timing (e.g., "Exactly when will I get married?"), deep karmic analysis, or complex medical astrology, politely explain that such deep analysis requires human intuition and suggest they "Book a Consultation" with our expert astrologers for a detailed reading.`;
 
         let reply = "";
 
