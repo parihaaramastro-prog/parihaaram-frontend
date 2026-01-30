@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { History, MapPin, Loader2, Sparkles, CheckCircle2, Clock3, FileText, ChevronRight } from "lucide-react";
 import { consultationService } from "@/lib/services/consultation";
+import { settingsService } from "@/lib/services/settings";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -11,9 +12,19 @@ export default function ConsultationHistoryPage() {
     const router = useRouter();
     const [consultations, setConsultations] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isEnabled, setIsEnabled] = useState(true);
+    const [checking, setChecking] = useState(true);
 
     useEffect(() => {
         const checkUser = async () => {
+            const settings = await settingsService.getSettings();
+            if (settings.consultation_enabled === false) {
+                setIsEnabled(false);
+                setChecking(false);
+                return;
+            }
+            setChecking(false);
+
             const supabase = createClient();
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
@@ -47,6 +58,32 @@ export default function ConsultationHistoryPage() {
             default: return 'QUEUED';
         }
     };
+
+    if (!checking && !isEnabled) {
+        return (
+            <main className="min-h-screen pb-20 px-6 flex flex-col items-center justify-center text-center">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="max-w-md space-y-6"
+                >
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <History className="w-8 h-8 text-slate-400" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-tight">History Unavailable</h1>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                        Consultation services are currently paused. Your history will be available when services resume.
+                    </p>
+                    <button
+                        onClick={() => router.push('/dashboard')}
+                        className="px-8 py-3 bg-slate-900 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg"
+                    >
+                        Back to Dashboard
+                    </button>
+                </motion.div>
+            </main>
+        );
+    }
 
     return (
         <main className="min-h-screen pb-40 px-6">

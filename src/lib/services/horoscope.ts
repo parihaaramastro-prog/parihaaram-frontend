@@ -10,6 +10,7 @@ export interface SavedHoroscope {
     lat: number;
     lon: number;
     chart_data?: any; // Cached calculation results
+    ai_summary?: string; // AI generated summary
     created_at: string;
 }
 
@@ -33,7 +34,8 @@ export const horoscopeService = {
                 pob: data.pob,
                 lat: data.lat,
                 lon: data.lon,
-                chart_data: data.chart_data
+                chart_data: data.chart_data,
+                ai_summary: data.ai_summary
             })
             .select()
             .single();

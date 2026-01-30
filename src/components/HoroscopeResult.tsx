@@ -18,11 +18,12 @@ import { createClient } from "@/lib/supabase";
 interface HoroscopeResultProps {
     results: AstrologyResults;
     onReset: () => void;
-    inputData: { name?: string; dob: string; tob: string; pob: string; lat: number; lon: number; gender?: string };
+    inputData: { name?: string; dob: string; tob: string; pob: string; lat: number; lon: number; gender?: string; ai_summary?: string };
     language?: 'en' | 'ta';
     onLanguageChange?: (lang: 'en' | 'ta') => void;
     variant?: 'dashboard' | 'public';
     disableAutoSave?: boolean;
+    initialSummary?: string; // If loaded from saved
 }
 
 const TRANSLATIONS = {
@@ -151,6 +152,8 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
     const [user, setUser] = useState<any>(null);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [aiSummary, setAiSummary] = useState<string | null>(inputData.ai_summary || null); // Check inputData first (if passed from dashboard)
+    const [loadingSummary, setLoadingSummary] = useState(false);
 
     const t = TRANSLATIONS[language];
     const lagnaPersonality = LAGNA_PERSONALITIES[results.lagna.idx] || LAGNA_PERSONALITIES[0]; // Fallback
@@ -163,6 +166,31 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
         };
         checkUser();
     }, []);
+
+    // Fetch AI Summary if missing
+    useEffect(() => {
+        if (!aiSummary && !loadingSummary) {
+            const fetchSummary = async () => {
+                setLoadingSummary(true);
+                try {
+                    const res = await fetch('/api/ai/generate-summary', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chartData: results, bio: inputData })
+                    });
+                    const data = await res.json();
+                    if (data.summary) {
+                        setAiSummary(data.summary);
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch summary:", e);
+                } finally {
+                    setLoadingSummary(false);
+                }
+            };
+            fetchSummary();
+        }
+    }, [aiSummary, results, inputData]);
 
     const handleSave = async (overrideName?: string) => {
         if (!user) return;
@@ -180,7 +208,8 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                 name,
                 ...inputData,
                 gender: inputData.gender || 'male',
-                chart_data: results
+                chart_data: results,
+                ai_summary: aiSummary || undefined
             });
             setSaved(true);
             // setTimeout(() => setSaved(false), 3000); // Keep it saved status
@@ -308,8 +337,35 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                 </div>
             </div>
 
-            {/* Charts & AI Section Restructured */}
             <div className="space-y-12 w-full max-w-[1200px] mx-auto px-6 md:px-0">
+                {/* AI Summary Section */}
+                <div className="bg-white border border-indigo-100 rounded-2xl p-8 shadow-sm space-y-6 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-600" />
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">
+                            {language === 'ta' ? 'AI ஜாதக சுருக்கம்' : 'AI Life Snapshot'}
+                        </h3>
+                    </div>
+
+                    {loadingSummary ? (
+                        <div className="flex items-center gap-3 py-4">
+                            <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">
+                                {language === 'ta' ? 'கணித்துக் கொண்டிருக்கிறது...' : 'Generating Personal Analysis...'}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="prose prose-sm prose-indigo max-w-none">
+                            <p className="text-slate-700 leading-relaxed font-medium">
+                                {aiSummary}
+                            </p>
+                        </div>
+                    )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                     {/* Main Chart */}
                     <section className="space-y-6 h-full">

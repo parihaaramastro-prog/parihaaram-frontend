@@ -63,6 +63,7 @@ export default function AdminDashboard() {
 
     // Settings State
     const [razorpayEnabled, setRazorpayEnabled] = useState(false);
+    const [consultationEnabled, setConsultationEnabled] = useState(true);
     const [packPrice, setPackPrice] = useState(49);
     const [packCredits, setPackCredits] = useState(10);
     const [aiModel, setAiModel] = useState<string>('gpt-4o');
@@ -130,6 +131,7 @@ export default function AdminDashboard() {
         fetchData();
         settingsService.getSettings().then(s => {
             setRazorpayEnabled(s.razorpay_enabled);
+            setConsultationEnabled(s.consultation_enabled ?? true);
             setPackPrice(s.pack_price);
             setPackCredits(s.pack_credits);
             if (s.ai_model) setAiModel(s.ai_model);
@@ -141,6 +143,16 @@ export default function AdminDashboard() {
             console.warn("Settings table might need update");
         });
     }, []);
+
+    const toggleConsultation = async () => {
+        try {
+            const newState = !consultationEnabled;
+            setConsultationEnabled(newState);
+            await settingsService.updateSettings({ consultation_enabled: newState });
+        } catch (e: any) {
+            alert("Settings Update Failed: " + e.message + "\n\nYou likely need to add columns to your 'app_settings' table.");
+        }
+    };
 
     const toggleRazorpay = async () => {
         try {
@@ -800,6 +812,18 @@ export default function AdminDashboard() {
                                         className={`w-14 h-8 rounded-full p-1 transition-colors ${razorpayEnabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
                                     >
                                         <div className={`w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${razorpayEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                                    </button>
+                                </div>
+                                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-base font-bold text-slate-900">Consultation Features</h3>
+                                        <p className="text-xs text-slate-500">Enable/Disable consultation booking and history globally.</p>
+                                    </div>
+                                    <button
+                                        onClick={toggleConsultation}
+                                        className={`w-14 h-8 rounded-full p-1 transition-colors ${consultationEnabled ? 'bg-emerald-500' : 'bg-slate-200'}`}
+                                    >
+                                        <div className={`w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${consultationEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
                                     </button>
                                 </div>
 

@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase";
 import UserProfileDropdown from "./UserProfileDropdown";
 import AuthModal from "./AuthModal";
 import { horoscopeService } from "@/lib/services/horoscope";
+import { settingsService } from "@/lib/services/settings";
 
 export default function Navbar() {
     const pathname = usePathname();
@@ -22,10 +23,13 @@ export default function Navbar() {
     const [user, setUser] = useState<any>(null);
     const [role, setRole] = useState<string | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isConsultationEnabled, setIsConsultationEnabled] = useState(true);
 
     useEffect(() => {
         const handleScroll = () => setIsScrolled(window.scrollY > 20);
         window.addEventListener("scroll", handleScroll);
+
+        settingsService.getSettings().then(s => setIsConsultationEnabled(s.consultation_enabled ?? true));
 
         const supabase = createClient();
         supabase.auth.getSession().then(({ data: { session }, error }) => {
@@ -99,10 +103,11 @@ export default function Navbar() {
         ],
         customer: [
             { id: 'dashboard', label: 'Dashboard', icon: Compass, href: '/dashboard' },
-            { id: 'expertise', label: 'Consult', icon: Sparkles, href: '/consultation' },
-            { id: 'history', label: 'Readings', icon: History, href: '/consultation/history' },
+            ...(isConsultationEnabled ? [
+                { id: 'expertise', label: 'Consult', icon: Sparkles, href: '/consultation' },
+                { id: 'history', label: 'Readings', icon: History, href: '/consultation/history' },
+            ] : []),
             { id: 'chat', label: 'AI Astrologer', icon: Bot, href: '/chat' },
-
         ],
     };
 

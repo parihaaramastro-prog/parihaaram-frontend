@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase";
 
 export interface AppSettings {
     razorpay_enabled: boolean;
+    consultation_enabled: boolean;
     pack_price: number;
     pack_credits: number;
     ai_model?: string;
@@ -31,6 +32,7 @@ export const settingsService = {
             // Default fallback
             return {
                 razorpay_enabled: false,
+                consultation_enabled: true,
                 pack_price: 99,
                 pack_credits: 5,
                 ai_model: 'gpt-4o',

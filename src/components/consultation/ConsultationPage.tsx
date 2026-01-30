@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { BookOpen, Briefcase, Heart, Activity, DollarSign, MessageSquare, Loader2, ChevronRight, CheckCircle2, History } from "lucide-react";
 import { horoscopeService, SavedHoroscope } from "@/lib/services/horoscope";
 import { consultationService } from "@/lib/services/consultation";
+import { settingsService } from "@/lib/services/settings";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -24,9 +25,19 @@ export default function ConsultationPage() {
     const [comments, setComments] = useState("");
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [isEnabled, setIsEnabled] = useState(true);
+    const [checking, setChecking] = useState(true);
 
     useEffect(() => {
         const checkUser = async () => {
+            const settings = await settingsService.getSettings();
+            if (settings.consultation_enabled === false) {
+                setIsEnabled(false);
+                setChecking(false);
+                return;
+            }
+            setChecking(false);
+
             const supabase = createClient();
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
@@ -70,6 +81,38 @@ export default function ConsultationPage() {
             setLoading(false);
         }
     };
+
+    if (!checking && !isEnabled) {
+        return (
+            <main className="min-h-screen pb-20 px-6 flex flex-col items-center justify-center text-center">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="max-w-md space-y-6"
+                >
+                    <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Briefcase className="w-8 h-8 text-slate-400" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-slate-900 uppercase tracking-tight">Consultations Unavailable</h1>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                        We are currently pausing new consultation requests to ensure quality service for existing clients. Please check back later or use our AI Astrologer.
+                    </p>
+                    <button
+                        onClick={() => router.push('/chat')}
+                        className="px-8 py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20"
+                    >
+                        Chat with AI
+                    </button>
+                    <button
+                        onClick={() => router.push('/dashboard')}
+                        className="block w-full py-3 text-xs font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600"
+                    >
+                        Back to Dashboard
+                    </button>
+                </motion.div>
+            </main>
+        );
+    }
 
     if (submitted) {
         return (

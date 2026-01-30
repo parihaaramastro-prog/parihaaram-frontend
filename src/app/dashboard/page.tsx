@@ -14,6 +14,7 @@ import {
 import AuthModal from "@/components/AuthModal";
 import { createClient } from "@/lib/supabase";
 import { consultationService, ConsultationRequest } from "@/lib/services/consultation";
+import { settingsService } from "@/lib/services/settings";
 import { useRouter } from "next/navigation";
 import UserProfileDropdown from "@/components/UserProfileDropdown";
 
@@ -26,6 +27,7 @@ function DashboardContent() {
     const [myConsultations, setMyConsultations] = useState<ConsultationRequest[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [fromSaved, setFromSaved] = useState(false);
+    const [consultationEnabled, setConsultationEnabled] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
@@ -38,6 +40,7 @@ function DashboardContent() {
             setUser(session.user);
             consultationService.getMyConsultations().then(setMyConsultations);
         });
+        settingsService.getSettings().then(s => setConsultationEnabled(s.consultation_enabled ?? true));
     }, []);
 
     // Separated effect to run ONLY when user is set
@@ -102,7 +105,7 @@ function DashboardContent() {
         if (h.chart_data) {
             setLoading(true);
             setTimeout(() => {
-                setLastInput({ dob: h.dob, tob: h.tob, pob: h.pob, lat: h.lat, lon: h.lon, name: h.name });
+                setLastInput({ dob: h.dob, tob: h.tob, pob: h.pob, lat: h.lat, lon: h.lon, name: h.name, ai_summary: h.ai_summary });
                 setResults(h.chart_data);
                 setLoading(false);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -206,33 +209,37 @@ function DashboardContent() {
                                     <p className="hidden sm:block text-indigo-100 text-[10px] font-medium tracking-wide uppercase">For self or family</p>
                                 </button>
 
-                                {/* Quick Access: Consultations */}
-                                <Link
-                                    href="/consultation"
-                                    className="bg-white border border-slate-200 hover:border-indigo-500 hover:shadow-md p-4 rounded-2xl text-center flex flex-col items-center justify-center gap-3 transition-all group hover:-translate-y-1 aspect-square sm:aspect-auto sm:h-full"
-                                >
-                                    <div className="space-y-2 flex flex-col items-center">
-                                        <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
-                                            <Sparkles className="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors" />
-                                        </div>
-                                        <h3 className="text-sm sm:text-base font-bold leading-tight text-slate-900">Consult</h3>
-                                    </div>
-                                    <p className="hidden sm:block text-slate-500 text-[10px] font-bold tracking-wide uppercase group-hover:text-indigo-600 transition-colors">Get personalized remedies</p>
-                                </Link>
+                                {consultationEnabled && (
+                                    <>
+                                        {/* Quick Access: Consultations */}
+                                        <Link
+                                            href="/consultation"
+                                            className="bg-white border border-slate-200 hover:border-indigo-500 hover:shadow-md p-4 rounded-2xl text-center flex flex-col items-center justify-center gap-3 transition-all group hover:-translate-y-1 aspect-square sm:aspect-auto sm:h-full"
+                                        >
+                                            <div className="space-y-2 flex flex-col items-center">
+                                                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
+                                                    <Sparkles className="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors" />
+                                                </div>
+                                                <h3 className="text-sm sm:text-base font-bold leading-tight text-slate-900">Consult</h3>
+                                            </div>
+                                            <p className="hidden sm:block text-slate-500 text-[10px] font-bold tracking-wide uppercase group-hover:text-indigo-600 transition-colors">Get personalized remedies</p>
+                                        </Link>
 
-                                {/* Quick Access: History */}
-                                <Link
-                                    href="/consultation/history"
-                                    className="bg-white border border-slate-200 hover:border-indigo-500 hover:shadow-md p-4 rounded-2xl text-center flex flex-col items-center justify-center gap-3 transition-all group hover:-translate-y-1 aspect-square sm:aspect-auto sm:h-full"
-                                >
-                                    <div className="space-y-2 flex flex-col items-center">
-                                        <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-slate-900 transition-colors">
-                                            <History className="w-6 h-6 text-slate-600 group-hover:text-white transition-colors" />
-                                        </div>
-                                        <h3 className="text-sm sm:text-base font-bold leading-tight text-slate-900">History</h3>
-                                    </div>
-                                    <p className="hidden sm:block text-slate-500 text-[10px] font-bold tracking-wide uppercase group-hover:text-indigo-600 transition-colors">Past readings & chats</p>
-                                </Link>
+                                        {/* Quick Access: History */}
+                                        <Link
+                                            href="/consultation/history"
+                                            className="bg-white border border-slate-200 hover:border-indigo-500 hover:shadow-md p-4 rounded-2xl text-center flex flex-col items-center justify-center gap-3 transition-all group hover:-translate-y-1 aspect-square sm:aspect-auto sm:h-full"
+                                        >
+                                            <div className="space-y-2 flex flex-col items-center">
+                                                <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center group-hover:bg-slate-900 transition-colors">
+                                                    <History className="w-6 h-6 text-slate-600 group-hover:text-white transition-colors" />
+                                                </div>
+                                                <h3 className="text-sm sm:text-base font-bold leading-tight text-slate-900">History</h3>
+                                            </div>
+                                            <p className="hidden sm:block text-slate-500 text-[10px] font-bold tracking-wide uppercase group-hover:text-indigo-600 transition-colors">Past readings & chats</p>
+                                        </Link>
+                                    </>
+                                )}
 
                                 {/* AI Astrologer */}
                                 <Link
