@@ -144,6 +144,32 @@ function ChatContent() {
         }
     };
 
+    // Helper to ensure chart data exists (moved out so it can be reused)
+    const ensureChartData = async (p: SavedHoroscope): Promise<SavedHoroscope> => {
+        if (p.chart_data && typeof p.chart_data === 'object' && Object.keys(p.chart_data).length > 0) return p;
+
+        console.log(`Calculating chart for ${p.name}...`);
+        try {
+            const res = await fetch("/api/astrology", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ dob: p.dob, tob: p.tob, lat: p.lat, lon: p.lon })
+            });
+
+            if (!res.ok) throw new Error("Failed to calculate chart");
+
+            const data = await res.json();
+            // Update in DB
+            await horoscopeService.updateHoroscope(p.id, { chart_data: data });
+
+            // Return updated object
+            return { ...p, chart_data: data };
+        } catch (e) {
+            console.error("Chart calc failed:", e);
+            return p; // Return original if fail, so flow doesn't break entirely
+        }
+    };
+
     // 2. Load Messages when Chat ID Changes
     useEffect(() => {
         if (!currentChatId || !userId) return;
@@ -200,24 +226,6 @@ function ChatContent() {
                 try {
                     let partner = savedProfiles[0];
                     let you = savedProfiles[1];
-
-                    // Helper to ensure chart data exists
-                    const ensureChartData = async (p: SavedHoroscope) => {
-                        if (p.chart_data && Object.keys(p.chart_data).length > 0) return p;
-
-                        console.log(`Calculating chart for ${p.name}...`);
-                        const res = await fetch("/api/astrology", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ dob: p.dob, tob: p.tob, lat: p.lat, lon: p.lon })
-                        });
-
-                        if (!res.ok) throw new Error("Failed to calculate chart");
-
-                        const data = await res.json();
-                        await horoscopeService.updateHoroscope(p.id, { chart_data: data });
-                        return { ...p, chart_data: data };
-                    };
 
                     // Validate both profiles in parallel
                     const [updatedPartner, updatedYou] = await Promise.all([
@@ -405,21 +413,33 @@ function ChatContent() {
             }
 
             if (isPrimary) {
-                await chatService.updateSessionProfiles(currentChatId, profile.id, undefined);
-                setPrimaryProfile(profile);
+                const updatedProfile = await ensureChartData(profile);
+                // Update local list if changed
+                if (updatedProfile !== profile) {
+                    setSavedProfiles(prev => prev.map(p => p.id === updatedProfile.id ? updatedProfile : p));
+                }
+
+                await chatService.updateSessionProfiles(currentChatId, updatedProfile.id, undefined);
+                setPrimaryProfile(updatedProfile);
 
                 // Auto-trigger Life Prediction
                 // We send a hidden message acting as the user asking for a prediction.
                 // We pass the profile explicitly in overrideParams to ensure it's used even if state update is pending.
-                const autoPrompt = `Analyze ${profile.name}'s chart and provide a detailed 'Life Prediction' covering: 1. Core Nature & Personality 2. Current Emotional State 3. Best Career Paths 4. Marriage & Relationship Outlook 5. Relationship with Parents. At the end, please list 3 specific follow-up questions I can ask to elaborate on these topics.`;
+                const autoPrompt = `Analyze ${updatedProfile.name}'s chart and provide a detailed 'Life Prediction' covering: 1. Core Nature & Personality 2. Current Emotional State 3. Best Career Paths 4. Marriage & Relationship Outlook 5. Relationship with Parents. At the end, please list 3 specific follow-up questions I can ask to elaborate on these topics.`;
 
                 // Only trigger if this is a fresh start (no messages yet) or user explicitly switches (context switch)
                 // Actually, user requested "when profile is selected", so we just do it.
-                handleSend(autoPrompt, true, { p1: profile });
+                handleSend(autoPrompt, true, { p1: updatedProfile });
 
             } else {
-                await chatService.updateSessionProfiles(currentChatId, undefined, profile.id);
-                setSecondaryProfile(profile);
+                const updatedProfile = await ensureChartData(profile);
+                // Update local list if changed
+                if (updatedProfile !== profile) {
+                    setSavedProfiles(prev => prev.map(p => p.id === updatedProfile.id ? updatedProfile : p));
+                }
+
+                await chatService.updateSessionProfiles(currentChatId, undefined, updatedProfile.id);
+                setSecondaryProfile(updatedProfile);
             }
 
         } catch (e) {
@@ -825,29 +845,29 @@ function ChatContent() {
 
                     {/* Header - Clean and Compact */}
                     <header className="absolute top-0 inset-x-0 z-20 flex flex-col bg-white/90 backdrop-blur-lg border-b border-slate-100 shadow-sm">
-                        <div className="px-4 py-2.5 md:px-5 md:py-3 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
+                        <div className="px-3 py-2 md:px-5 md:py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 md:gap-3">
                                 <button
                                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                                    className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
+                                    className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
                                 >
-                                    <Sidebar className="w-5 h-5" />
+                                    <Sidebar className="w-4 h-4 md:w-5 md:h-5" />
                                 </button>
                                 <div className="flex flex-col">
-                                    <span className="font-bold text-slate-900 text-sm leading-none">AI Astrologer</span>
-                                    <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
+                                    <span className="font-bold text-slate-900 text-xs md:text-sm leading-none">AI Astrologer</span>
+                                    <span className="text-[9px] md:text-[10px] text-green-500 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Online
                                     </span>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 md:gap-2">
                                 {/* Credit Pill */}
                                 <button
                                     onClick={() => setShowPayModal(true)}
-                                    className="flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm"
+                                    className="flex items-center gap-1 md:gap-1.5 bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 text-amber-700 border border-amber-200 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full text-[10px] md:text-xs font-bold transition-all shadow-sm"
                                 >
-                                    <Coins className="w-3.5 h-3.5" />
+                                    <Coins className="w-3 h-3 md:w-3.5 md:h-3.5" />
                                     <span>
                                         {credits !== null
                                             ? (credits > 999 ? '999+' : credits)
@@ -858,7 +878,7 @@ function ChatContent() {
 
                                 <button
                                     onClick={() => createNewChat()}
-                                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-900 hover:bg-indigo-600 text-white transition-all shadow-lg hover:shadow-indigo-500/25 hover:scale-105 active:scale-95"
+                                    className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-xl bg-slate-900 hover:bg-indigo-600 text-white transition-all shadow-lg hover:shadow-indigo-500/25 hover:scale-105 active:scale-95"
                                     title="New Chat"
                                 >
                                     <Plus className="w-4 h-4" />
@@ -866,7 +886,7 @@ function ChatContent() {
 
                                 <Link
                                     href="/dashboard"
-                                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors border border-slate-200 shadow-sm"
+                                    className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center rounded-xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 transition-colors border border-slate-200 shadow-sm"
                                     title="Exit Chat"
                                 >
                                     <LogOut className="w-4 h-4" />
@@ -875,36 +895,36 @@ function ChatContent() {
                         </div>
 
                         {/* Active Context Bar */}
-                        <div className="px-4 md:px-5 pb-2.5 flex overflow-x-auto gap-2 items-center flex-nowrap scrollbar-hide">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-1 shrink-0">Context:</span>
+                        <div className="px-3 md:px-5 pb-2 md:pb-2.5 flex overflow-x-auto gap-1.5 md:gap-2 items-center flex-nowrap scrollbar-hide">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-0.5 md:mr-1 shrink-0">Context:</span>
 
                             <button
                                 onClick={() => openProfileSelector('primary')}
-                                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${primaryProfile ? 'bg-indigo-50 border-indigo-200 text-indigo-800 shadow-sm' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-600'}`}
+                                className={`shrink-0 flex items-center gap-1 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full text-[10px] md:text-xs font-semibold border transition-all ${primaryProfile ? 'bg-indigo-50 border-indigo-200 text-indigo-800 shadow-sm' : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-indigo-400 hover:text-indigo-600'}`}
                             >
-                                <User className="w-3.5 h-3.5" />
+                                <User className="w-3 h-3 md:w-3.5 md:h-3.5" />
                                 {primaryProfile ? primaryProfile.name : "Select Profile"}
                             </button>
 
                             {primaryProfile && (
                                 <>
-                                    <span className="text-slate-300 text-xs shrink-0">+</span>
+                                    <span className="text-slate-300 text-[10px] md:text-xs shrink-0">+</span>
                                     {secondaryProfile ? (
                                         <button
                                             onClick={() => openProfileSelector('secondary')}
-                                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border bg-pink-50 border-pink-200 text-pink-800 shadow-sm transition-all"
+                                            className="shrink-0 flex items-center gap-1 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full text-[10px] md:text-xs font-semibold border bg-pink-50 border-pink-200 text-pink-800 shadow-sm transition-all"
                                         >
-                                            <Users className="w-3.5 h-3.5" />
+                                            <Users className="w-3 h-3 md:w-3.5 md:h-3.5" />
                                             {secondaryProfile.name}
                                             <X className="w-3 h-3 ml-0.5 text-pink-400 hover:text-pink-700 cursor-pointer" onClick={(e) => { e.stopPropagation(); setSecondaryProfile(null); }} />
                                         </button>
                                     ) : (
                                         <button
                                             onClick={() => openProfileSelector('secondary')}
-                                            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 border-dashed border-slate-300 text-slate-400 hover:border-pink-400 hover:text-pink-500 hover:bg-pink-50 transition-all"
+                                            className="shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center border-2 border-dashed border-slate-300 text-slate-400 hover:border-pink-400 hover:text-pink-500 hover:bg-pink-50 transition-all"
                                             title="Add Partner"
                                         >
-                                            <Plus className="w-4 h-4" />
+                                            <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
                                         </button>
                                     )}
                                 </>
@@ -913,7 +933,7 @@ function ChatContent() {
                     </header>
 
                     {/* Messages Area - Clean spacing */}
-                    <div className={`flex-1 px-4 md:px-6 lg:px-8 pt-24 md:pt-28 pb-4 space-y-5 scrollbar-thin scrollbar-thumb-slate-200 relative ${credits !== null && credits <= 0 ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+                    <div className={`flex-1 px-3 md:px-6 lg:px-8 pt-[5.5rem] md:pt-28 pb-3 space-y-4 md:space-y-5 scrollbar-thin scrollbar-thumb-slate-200 relative ${credits !== null && credits <= 0 ? 'overflow-hidden' : 'overflow-y-auto'}`}>
 
                         {/* LOADING STATE - INITIAL */}
                         {(credits === null) && (
@@ -1043,15 +1063,17 @@ function ChatContent() {
                                             key={msg.id || i}
                                             className={`flex gap-3 max-w-3xl ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
                                         >
-                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-1 shadow-sm ${msg.role === 'ai' ? 'bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-600' : 'bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600'}`}>
-                                                {msg.role === 'ai' ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                                            </div>
+                                            {msg.role === 'ai' && (
+                                                <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg md:rounded-xl flex items-center justify-center shrink-0 mt-0.5 md:mt-1 shadow-sm bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-600">
+                                                    <Bot className="w-3 h-3 md:w-4 md:h-4" />
+                                                </div>
+                                            )}
 
                                             <div className="flex flex-col gap-2 min-w-0">
                                                 <div
-                                                    className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                                                        ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-tr-md shadow-lg shadow-indigo-500/20'
-                                                        : 'bg-white border border-slate-100 text-slate-700 rounded-tl-md shadow-md'
+                                                    className={`px-3 py-2 md:px-4 md:py-3 rounded-xl md:rounded-2xl text-[13px] md:text-sm leading-relaxed ${msg.role === 'user'
+                                                        ? 'bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-tr-sm md:rounded-tr-md shadow-lg shadow-indigo-500/20'
+                                                        : 'bg-white border border-slate-100 text-slate-700 rounded-tl-sm md:rounded-tl-md shadow-md'
                                                         }`}
                                                 >
                                                     <ReactMarkdown
@@ -1091,7 +1113,7 @@ function ChatContent() {
 
                     {/* Input Area - Premium Design */}
                     {primaryProfile ? (
-                        <div className="px-4 md:px-6 pb-4 pt-2 shrink-0 max-w-4xl mx-auto w-full z-10 relative">
+                        <div className="px-3 md:px-6 pb-2 md:pb-4 pt-2 shrink-0 max-w-4xl mx-auto w-full z-10 relative">
 
                             {/* Suggestion Prompts or Preset Pills */}
                             {!isTyping && (
@@ -1137,12 +1159,12 @@ function ChatContent() {
                             )}
 
 
-                            <div className="relative bg-white rounded-2xl p-2 flex items-end gap-2 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-indigo-500/30 transition-all">
+                            <div className="relative bg-white rounded-2xl p-1.5 md:p-2 flex items-end gap-2 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-indigo-500/30 transition-all">
                                 <textarea
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     placeholder={`Ask about ${primaryProfile.name}'s chart...`}
-                                    className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm text-slate-900 placeholder:text-slate-400 min-h-[44px] max-h-[120px] py-3 px-3 resize-none caret-indigo-600 font-sans"
+                                    className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-[13px] md:text-sm text-slate-900 placeholder:text-slate-400 min-h-[38px] md:min-h-[44px] max-h-[120px] py-2 md:py-3 px-2 md:px-3 resize-none caret-indigo-600 font-sans"
                                     rows={1}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -1155,12 +1177,12 @@ function ChatContent() {
                                 <button
                                     onClick={() => handleSend()}
                                     disabled={!input.trim() || isTyping}
-                                    className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 flex items-center justify-center text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 mb-0.5 shadow-lg shadow-indigo-500/30"
+                                    className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 flex items-center justify-center text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 mb-0.5 shadow-lg shadow-indigo-500/30"
                                 >
-                                    <ArrowUp className="w-5 h-5 stroke-[2.5]" />
+                                    <ArrowUp className="w-4 h-4 md:w-5 md:h-5 stroke-[2.5]" />
                                 </button>
                             </div>
-                            <p className="text-center text-[10px] text-slate-400 mt-2 font-medium tracking-wide">
+                            <p className="text-center text-[9px] md:text-[10px] text-slate-400 mt-1.5 md:mt-2 font-medium tracking-wide">
                                 AI Astrology predictions are for guidance only.
                             </p>
                         </div>

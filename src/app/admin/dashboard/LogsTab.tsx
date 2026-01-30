@@ -221,7 +221,7 @@ export default function LogsTab() {
                                     <summary className="text-[10px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer list-none flex items-center gap-2 hover:text-slate-600">
                                         <span>▶</span> View Generation Context
                                     </summary>
-                                    <pre className="mt-4 p-4 bg-slate-900 rounded-xl text-amber-500 text-[10px] font-mono overflow-x-auto">
+                                    <pre className="mt-4 p-4 bg-slate-900 rounded-xl text-amber-500 text-[10px] font-mono whitespace-pre-wrap break-words">
                                         {JSON.stringify(selectedArchive.context_snapshot, null, 2)}
                                     </pre>
                                 </details>

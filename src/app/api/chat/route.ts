@@ -54,6 +54,42 @@ async function calculateChartData(dob: string, tob: string, lat: number, lon: nu
     }
 }
 
+// Helper to get Sign Index from Name (0=Aries, 11=Pisces)
+const getSignIndex = (name: string | undefined | null): number => {
+    if (!name) return -1;
+    const n = name.toLowerCase().trim();
+    if (n.includes('aries') || n.includes('mesha')) return 0;
+    if (n.includes('taurus') || n.includes('vrish')) return 1;
+    if (n.includes('gemini') || n.includes('mith')) return 2;
+    if (n.includes('cancer') || n.includes('karka')) return 3;
+    if (n.includes('leo') || n.includes('simha')) return 4;
+    if (n.includes('virgo') || n.includes('kanya')) return 5;
+    if (n.includes('libra') || n.includes('tula')) return 6;
+    if (n.includes('scorpio') || n.includes('vrishchi')) return 7;
+    if (n.includes('sagitt') || n.includes('dhanu')) return 8;
+    if (n.includes('capri') || n.includes('makara')) return 9;
+    if (n.includes('aquar') || n.includes('kumbha')) return 10;
+    if (n.includes('pisces') || n.includes('meena')) return 11;
+    return -1; // Unknown
+};
+
+// Helper to format planetary positions string
+const formatPlanetaryPositions = (c: any) => {
+    const lagnaIdx = typeof c.lagna?.idx === 'number' ? c.lagna.idx : getSignIndex(c.lagna?.name || '');
+
+    return c.planets?.map((p: any) => {
+        // Check both 'rashi' and 'sign' properties as the backend format might vary
+        const signName = p.rashi || p.sign || p.sign_name || "Unknown";
+        const idx = getSignIndex(signName);
+        let wsHouse = 0;
+        if (idx !== -1 && lagnaIdx !== -1) {
+            wsHouse = ((idx - lagnaIdx + 12) % 12) + 1;
+        }
+        const deg = typeof p.degrees === 'number' ? p.degrees.toFixed(2) : p.degrees;
+        return `- ${p.name}: ${signName} at ${deg}° (House ${wsHouse > 0 ? wsHouse : p.house + ' [Source]'} - Whole Sign)`;
+    }).join('\n');
+};
+
 export async function POST(req: NextRequest) {
     try {
         const cookieStore = await cookies();
@@ -253,42 +289,13 @@ Otherwise, answer the user's question directly based on the provided context.`;
                 const birthBhuktiStr = birthBhuktiObj ? `${birthBhuktiObj.planet} Bhukti (Ended: ${birthBhuktiObj.end_date})` : "Unknown";
                 // ----------------------------------------
 
-                // Helper to get Sign Index from Name (0=Aries, 11=Pisces)
-                const getSignIndex = (name: string | undefined | null): number => {
-                    if (!name) return -1;
-                    const n = name.toLowerCase().trim();
-                    if (n.includes('aries') || n.includes('mesha')) return 0;
-                    if (n.includes('taurus') || n.includes('vrish')) return 1;
-                    if (n.includes('gemini') || n.includes('mith')) return 2;
-                    if (n.includes('cancer') || n.includes('karka')) return 3;
-                    if (n.includes('leo') || n.includes('simha')) return 4;
-                    if (n.includes('virgo') || n.includes('kanya')) return 5;
-                    if (n.includes('libra') || n.includes('tula')) return 6;
-                    if (n.includes('scorpio') || n.includes('vrishchi')) return 7;
-                    if (n.includes('sagitt') || n.includes('dhanu')) return 8;
-                    if (n.includes('capri') || n.includes('makara')) return 9;
-                    if (n.includes('aquar') || n.includes('kumbha')) return 10;
-                    if (n.includes('pisces') || n.includes('meena')) return 11;
-                    return -1; // Unknown
-                };
-
                 const lagnaIdx = typeof c.lagna?.idx === 'number' ? c.lagna.idx : getSignIndex(c.lagna?.name || '');
                 const lagnaDegree = typeof c.lagna?.degrees === 'number' ? c.lagna.degrees.toFixed(2) : c.lagna?.degrees ?? '0';
 
                 console.log(`[AI Context] Lagna: ${c.lagna?.name} (Idx: ${lagnaIdx}) -> House 1 Reference`);
 
                 // Recalculate Planets with strict Whole Sign logic
-                const planetsContext = c.planets?.map((p: any) => {
-                    // Check both 'rashi' and 'sign' properties as the backend format might vary
-                    const signName = p.rashi || p.sign || p.sign_name || "Unknown";
-                    const idx = getSignIndex(signName);
-                    let wsHouse = 0;
-                    if (idx !== -1 && lagnaIdx !== -1) {
-                        wsHouse = ((idx - lagnaIdx + 12) % 12) + 1;
-                    }
-                    const deg = typeof p.degrees === 'number' ? p.degrees.toFixed(2) : p.degrees;
-                    return `- ${p.name}: ${signName} at ${deg}° (House ${wsHouse > 0 ? wsHouse : p.house + ' [Source]'} - Whole Sign)`;
-                }).join('\n');
+                const planetsContext = formatPlanetaryPositions(c);
 
                 // --- NEW: Full Dasha Timeline (Limited to 20 years into future) ---
                 const dashaTimeline = c.mahadashas?.filter((m: any) => {
@@ -344,12 +351,20 @@ Note: Precise planetary positions are currently unavailable. Answer based on gen
 
             if (secondaryProfile && secondaryProfile.chart_data) {
                 const c2 = secondaryProfile.chart_data;
+                const lagnaIdx2 = typeof c2.lagna?.idx === 'number' ? c2.lagna.idx : getSignIndex(c2.lagna?.name || '');
+                const planetsContext2 = formatPlanetaryPositions(c2);
+
                 systemPrompt += `\n\nComparison Profile (Partner/Other):
 Name: ${secondaryProfile.name}
 Birth Details: ${secondaryProfile.dob} at ${secondaryProfile.tob || '12:00'} in ${secondaryProfile.pob || 'Unknown'}
 Lagna: ${c2.lagna?.name}
 Rasi: ${c2.moon_sign?.name}
 Nakshatra: ${c2.nakshatra?.name}
+
+Planetary Positions (Comparison Profile):
+${planetsContext2}
+
+Use this full chart data for compatibility or combined predictions.
 `;
             } else if (secondaryProfile) {
                 systemPrompt += `\n\nComparison Profile (Partner/Other):
