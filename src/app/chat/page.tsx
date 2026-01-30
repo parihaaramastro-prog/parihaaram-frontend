@@ -105,6 +105,13 @@ function ChatContent() {
             // Credits
             const c = await creditService.getCredits();
             setCredits(c);
+
+            // Handle Actions (e.g. returning from Create Page)
+            const action = searchParams.get('action');
+            if (action === 'select_profile') {
+                setIsModalOpen(true);
+                router.replace('/chat'); // Clear the param so it doesn't reopen on refresh
+            }
         };
 
         const checkMobile = () => {

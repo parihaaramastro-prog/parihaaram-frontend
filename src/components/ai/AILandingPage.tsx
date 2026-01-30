@@ -22,6 +22,7 @@ export default function AIAstrologerLanding() {
     // Form State
     const [formData, setFormData] = useState({
         name: "",
+        gender: "male", // Default
         dob: "",
         tob: "",
         pob: "",
@@ -137,7 +138,8 @@ export default function AIAstrologerLanding() {
             full_name: data.name,
             birth_date: data.dob,
             birth_time: data.tob,
-            birth_place: data.pob
+            birth_place: data.pob,
+            gender: data.gender // Update profile gender if applicable
         });
 
         // 2. Create Saved Horoscope (so it appears in chat selector)
@@ -151,7 +153,7 @@ export default function AIAstrologerLanding() {
                     pob: data.pob,
                     lat: data.lat,
                     lon: data.lon,
-                    gender: 'male' // Default for landing page quick capture
+                    gender: data.gender || 'male'
                 });
                 savedProfileId = savedProfile?.id || null;
             } catch (e) {
@@ -208,7 +210,7 @@ export default function AIAstrologerLanding() {
                                 className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-600/5 border border-indigo-600/10 text-indigo-700 text-xs font-bold uppercase tracking-widest"
                             >
                                 <Sparkles className="w-3.5 h-3.5 fill-indigo-700" />
-                                <span>AI Vedic Astrologer</span>
+                                <span className="text-cyan-600">AI Vedic Astrologer</span>
                             </motion.div>
 
                             <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tighter leading-[0.95]">
@@ -258,15 +260,31 @@ export default function AIAstrologerLanding() {
                                 <h3 className="text-2xl font-black text-slate-900 tracking-tight">Reveal Your Deepest Desires & Hidden Destiny</h3>
 
                                 <div className="space-y-5">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Name</label>
-                                        <input
-                                            type="text"
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all placeholder:font-medium placeholder:text-slate-400"
-                                            placeholder="Enter your full name"
-                                        />
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="col-span-2 md:col-span-1 space-y-1.5">
+                                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Name</label>
+                                            <input
+                                                type="text"
+                                                value={formData.name}
+                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all placeholder:font-medium placeholder:text-slate-400"
+                                                placeholder="Enter full name"
+                                            />
+                                        </div>
+
+                                        <div className="col-span-2 md:col-span-1 space-y-1.5">
+                                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest pl-1">Gender</label>
+                                            <select
+                                                value={formData.gender}
+                                                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 outline-none transition-all cursor-pointer appearance-none"
+                                            >
+                                                <option value="male">Male</option>
+                                                <option value="female">Female</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </div>
                                     </div>
 
                                     <div className="space-y-4">

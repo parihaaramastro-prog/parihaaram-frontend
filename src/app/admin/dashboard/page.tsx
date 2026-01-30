@@ -14,7 +14,8 @@ import { consultationService } from "@/lib/services/consultation";
 import { profileService, User } from "@/lib/services/profile";
 import { settingsService } from "@/lib/services/settings";
 import { creditService } from "@/lib/services/credits";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import OverviewTab from "./OverviewTab";
+import LogsTab from "./LogsTab";
 
 import Link from "next/link";
 import ConfirmationModal from "@/components/ConfirmationModal";
@@ -25,8 +26,7 @@ export default function AdminDashboard() {
     const [astrologers, setAstrologers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({ total: 0, pending: 0, complete: 0 });
-    const [metrics, setMetrics] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState<'overview' | 'consultations' | 'staff' | 'settings' | 'users' | 'ai-config'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'consultations' | 'staff' | 'settings' | 'users' | 'ai-config' | 'logs'>('overview');
 
     const [confirmationState, setConfirmationState] = useState<{
         isOpen: boolean;
@@ -70,10 +70,6 @@ export default function AdminDashboard() {
     const [systemPrompt, setSystemPrompt] = useState("");
     const [masterPrompt, setMasterPrompt] = useState(""); // Master prompt to set the tone
     const [isPromptActive, setIsPromptActive] = useState(true);
-    const [chatLogs, setChatLogs] = useState<any[]>([]);
-    const [selectedLog, setSelectedLog] = useState<any | null>(null);
-    const [logSearch, setLogSearch] = useState("");
-    const [logFilterUser, setLogFilterUser] = useState<string>("all");
 
     // Presets State
     const [presets, setPresets] = useState<{ name: string; content: string }[]>([]);
@@ -100,10 +96,6 @@ export default function AdminDashboard() {
             const userRes = await fetch('/api/admin/users');
             const userData = await userRes.json();
 
-            // Fetch Stats API
-            const statsRes = await fetch('/api/admin/stats');
-            const statsData = await statsRes.json();
-            setMetrics(statsData);
 
             setConsultations(conData);
             setAstrologers(astroData);
@@ -117,8 +109,6 @@ export default function AdminDashboard() {
             setUserCredits(creditMap);
 
             const supabase = createClient();
-            const { data: logs } = await supabase.from('chat_logs').select('*').order('created_at', { ascending: false }).limit(100);
-            setChatLogs(logs || []);
 
             const pending = conData.filter((c: any) => c.status === 'pending').length;
             const complete = conData.filter((c: any) => c.status === 'completed').length;
@@ -478,7 +468,8 @@ export default function AdminDashboard() {
                         { id: 'staff', label: 'Staff' },
                         { id: 'users', label: 'Users' },
                         { id: 'settings', label: 'Config' },
-                        { id: 'ai-config', label: 'Intelligence' }
+                        { id: 'ai-config', label: 'Intelligence' },
+                        { id: 'logs', label: 'Live Logs' }
                     ].map((tab) => (
                         <button
                             key={tab.id}
@@ -519,71 +510,8 @@ export default function AdminDashboard() {
                 <div className="max-w-[1600px] mx-auto space-y-6 pb-20">
 
                     <AnimatePresence mode="wait">
-                        {activeTab === 'overview' && metrics && (
-                            <motion.div
-                                key="overview"
-                                initial={{ opacity: 0, scale: 0.98 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.98 }}
-                                className="space-y-6"
-                            >
-                                {/* KPI Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="p-2 bg-indigo-50 rounded-lg"><Activity className="w-5 h-5 text-indigo-600" /></div>
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Reports</p>
-                                        </div>
-                                        <p className="text-3xl font-bold text-slate-900">{metrics.overview.total_reports}</p>
-                                    </div>
-                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="p-2 bg-emerald-50 rounded-lg"><MessageSquare className="w-5 h-5 text-emerald-600" /></div>
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">AI Chats</p>
-                                        </div>
-                                        <p className="text-3xl font-bold text-slate-900">{metrics.overview.active_chats}</p>
-                                    </div>
-                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="p-2 bg-amber-50 rounded-lg"><Users className="w-5 h-5 text-amber-600" /></div>
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Messages</p>
-                                        </div>
-                                        <p className="text-3xl font-bold text-slate-900">{metrics.overview.total_messages}</p>
-                                    </div>
-                                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="p-2 bg-purple-50 rounded-lg"><ArrowUpRight className="w-5 h-5 text-purple-600" /></div>
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Growth (7d)</p>
-                                        </div>
-                                        <p className="text-3xl font-bold text-slate-900">+{metrics.overview.growth_rate}</p>
-                                    </div>
-                                </div>
-
-                                {/* Chart */}
-                                <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-                                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest mb-8">Report Generation Velocity (30 Days)</h3>
-                                    <div className="h-[300px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={metrics.chart}>
-                                                <defs>
-                                                    <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3} />
-                                                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                                <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
-                                                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
-                                                <Tooltip
-                                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                                    cursor={{ stroke: '#6366f1', strokeWidth: 2 }}
-                                                />
-                                                <Area type="monotone" dataKey="count" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </div>
-                            </motion.div>
+                        {activeTab === 'overview' && (
+                            <OverviewTab />
                         )}
 
                         {activeTab === 'consultations' && (
@@ -954,71 +882,55 @@ export default function AdminDashboard() {
                                 </div>
 
                                 {/* System Prompt Section */}
-                                <div className="flex-1 grid grid-cols-12 gap-6 min-h-0">
-                                    <div className="col-span-8 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
-                                        <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                                            <div className="flex items-center gap-4">
-                                                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">System Prompt</h3>
-                                                <div className="flex gap-2">
-                                                    {presets.map((p, i) => (
-                                                        <button
-                                                            key={i}
-                                                            onClick={() => loadPreset(p)}
-                                                            className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-2"
-                                                        >
-                                                            {p.name}
-                                                            <span onClick={(e) => { e.stopPropagation(); handleDeletePreset(i); }} className="hover:text-red-500">×</span>
-                                                        </button>
-                                                    ))}
-                                                    <button onClick={() => setShowSavePreset(!showSavePreset)} className="p-1 text-indigo-600 hover:bg-indigo-50 rounded" title="Save current prompt as preset">
-                                                        {showSavePreset ? <X className="w-4 h-4" /> : <span className="text-xs font-bold flex items-center gap-1"><Grid className="w-3 h-3" /> Save Preset</span>}
+                                <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
+                                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                                        <div className="flex items-center gap-4">
+                                            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">System Prompt</h3>
+                                            <div className="flex gap-2">
+                                                {presets.map((p, i) => (
+                                                    <button
+                                                        key={i}
+                                                        onClick={() => loadPreset(p)}
+                                                        className="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-2"
+                                                    >
+                                                        {p.name}
+                                                        <span onClick={(e) => { e.stopPropagation(); handleDeletePreset(i); }} className="hover:text-red-500">×</span>
                                                     </button>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                {showSavePreset && (
-                                                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
-                                                        <input
-                                                            value={newPresetName}
-                                                            onChange={e => setNewPresetName(e.target.value)}
-                                                            placeholder="Preset Name..."
-                                                            className="h-8 px-3 text-xs border border-slate-200 rounded-lg focus:border-indigo-500 outline-none"
-                                                        />
-                                                        <button onClick={handleSavePreset} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold">Save</button>
-                                                    </div>
-                                                )}
-                                                <button onClick={savePrompt} className="px-4 py-1.5 bg-slate-900 text-white rounded-md text-xs font-bold uppercase tracking-widest hover:bg-slate-800">
-                                                    Update Active Prompt
+                                                ))}
+                                                <button onClick={() => setShowSavePreset(!showSavePreset)} className="p-1 text-indigo-600 hover:bg-indigo-50 rounded" title="Save current prompt as preset">
+                                                    {showSavePreset ? <X className="w-4 h-4" /> : <span className="text-xs font-bold flex items-center gap-1"><Grid className="w-3 h-3" /> Save Preset</span>}
                                                 </button>
                                             </div>
                                         </div>
-                                        <textarea
-                                            value={systemPrompt}
-                                            onChange={e => setSystemPrompt(e.target.value)}
-                                            className="flex-1 p-6 text-sm font-mono text-slate-800 resize-none outline-none leading-relaxed"
-                                            placeholder="Define AI persona..."
-                                        />
-                                    </div>
-                                    <div className="col-span-4 bg-slate-900 rounded-2xl shadow-sm flex flex-col overflow-hidden border border-slate-800">
-                                        <div className="p-3 border-b border-slate-800 bg-slate-900 flex justify-between items-center">
-                                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Logs</h3>
-                                        </div>
-                                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                                            {chatLogs.map(log => (
-                                                <div key={log.id} onClick={() => setSelectedLog(log)} className="p-3 rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 cursor-pointer transition-colors group">
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <span className="text-[10px] font-bold text-indigo-400 uppercase truncate max-w-[120px]">
-                                                            {getUserName(log.user_id)}
-                                                        </span>
-                                                        <span className="text-[9px] font-mono text-slate-500">{new Date(log.created_at).toLocaleTimeString()}</span>
-                                                    </div>
-                                                    <p className="text-[11px] text-slate-300 line-clamp-2 group-hover:text-white transition-colors">{log.user_message}</p>
+                                        <div className="flex items-center gap-2">
+                                            {showSavePreset && (
+                                                <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                                                    <input
+                                                        value={newPresetName}
+                                                        onChange={e => setNewPresetName(e.target.value)}
+                                                        placeholder="Preset Name..."
+                                                        className="h-8 px-3 text-xs border border-slate-200 rounded-lg focus:border-indigo-500 outline-none"
+                                                    />
+                                                    <button onClick={handleSavePreset} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold">Save</button>
                                                 </div>
-                                            ))}
+                                            )}
+                                            <button onClick={savePrompt} className="px-4 py-1.5 bg-slate-900 text-white rounded-md text-xs font-bold uppercase tracking-widest hover:bg-slate-800">
+                                                Update Active Prompt
+                                            </button>
                                         </div>
                                     </div>
+                                    <textarea
+                                        value={systemPrompt}
+                                        onChange={e => setSystemPrompt(e.target.value)}
+                                        className="flex-1 p-6 text-sm font-mono text-slate-800 resize-none outline-none leading-relaxed"
+                                        placeholder="Define AI persona..."
+                                    />
                                 </div>
                             </motion.div>
+                        )}
+
+                        {activeTab === 'logs' && (
+                            <LogsTab />
                         )}
                     </AnimatePresence>
                 </div>
@@ -1071,39 +983,8 @@ export default function AdminDashboard() {
                 )}
             </AnimatePresence>
 
-            {/* Logs Modal */}
-            <AnimatePresence>
-                {selectedLog && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
-                        <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
-                            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                                <h3 className="text-sm font-bold text-slate-900 uppercase">Log Details</h3>
-                                <button onClick={() => setSelectedLog(null)}><X className="w-5 h-5 text-slate-400" /></button>
-                            </div>
-                            <div className="p-6 overflow-y-auto space-y-4 font-mono text-xs">
-                                <div className="space-y-2">
-                                    <span className="font-bold text-slate-600 text-xs tracking-widest uppercase mb-1 block">{getUserName(selectedLog.user_id)}</span>
-                                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm">{selectedLog.user_message}</div>
-                                </div>
-                                <div className="space-y-2">
-                                    <span className="font-bold text-emerald-600 text-xs">AI RESPONSE</span>
-                                    <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100 text-sm whitespace-pre-wrap">{selectedLog.ai_response}</div>
-                                </div>
-                                <div className="space-y-1">
-                                    <details className="group">
-                                        <summary className="font-bold text-slate-400 cursor-pointer list-none flex items-center gap-2">
-                                            <span>▶</span> CONTEXT DATA (Hidden)
-                                        </summary>
-                                        <div className="mt-2 bg-slate-900 p-3 rounded-lg text-amber-500 overflow-x-auto text-[10px]">
-                                            {selectedLog.context_snapshot}
-                                        </div>
-                                    </details>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </AnimatePresence>
+            {/* Logs Modal (Previously inline, keeping just in case or we can fully remove if covered by LogsTab) */}
+            {/* The LogsTab component now has its own modal, so we can likely remove this block or keep it for other debugging */}
 
         </main >
     );
