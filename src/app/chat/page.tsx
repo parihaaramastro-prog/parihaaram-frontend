@@ -299,8 +299,8 @@ function ChatContent() {
             setCurrentChatId(newSession.id);
             setPrimaryProfile(profile);
 
-            // Auto-trigger AI life prediction for seamless onboarding
-            const autoPrompt = `Analyze my chart (${profile.name}) and give me a relatable life prediction. Focus on my nature, current vibe, and what's coming up. End with a hook to ask more questions.`;
+            // Auto-trigger Life Prediction for seamless onboarding
+            const autoPrompt = `Analyze ${profile.name}'s chart and provide a detailed 'Life Prediction' covering: 1. Core Nature & Personality 2. Current Emotional State 3. Best Career Paths 4. Marriage & Relationship Outlook 5. Relationship with Parents. At the end, please list 3 specific follow-up questions I can ask to elaborate on these topics.`;
 
             // Wait a small delay for state to settle, then trigger the AI
             setTimeout(() => {
@@ -404,7 +404,7 @@ function ChatContent() {
                 // Auto-trigger Life Prediction
                 // We send a hidden message acting as the user asking for a prediction.
                 // We pass the profile explicitly in overrideParams to ensure it's used even if state update is pending.
-                const autoPrompt = `Analyze my chart (${profile.name}) and give me a relatable life prediction. Focus on my nature, current vibe, and what's coming up. End with a hook to ask more questions.`;
+                const autoPrompt = `Analyze ${profile.name}'s chart and provide a detailed 'Life Prediction' covering: 1. Core Nature & Personality 2. Current Emotional State 3. Best Career Paths 4. Marriage & Relationship Outlook 5. Relationship with Parents. At the end, please list 3 specific follow-up questions I can ask to elaborate on these topics.`;
 
                 // Only trigger if this is a fresh start (no messages yet) or user explicitly switches (context switch)
                 // Actually, user requested "when profile is selected", so we just do it.
@@ -500,12 +500,36 @@ function ChatContent() {
 
             // Set contextual suggestion prompts based on the response
             if (!hidden) {
-                const suggestions = [
-                    "Explain this in detail",
-                    "What remedies can help?",
-                    "Tell me more about this"
-                ];
-                setSuggestionPrompts(suggestions);
+                // Dynamic Suggestion Extraction Logic
+                const dynamicSuggestions: string[] = [];
+                const lastSentence = response.reply.trim().split(/[.!?]/).pop()?.trim();
+
+                // 1. If AI ends with a question, that's the best immediate follow-up context
+                if (response.reply.trim().endsWith("?")) {
+                    const lastQuestion = response.reply.trim().split("\n").pop()?.trim();
+                    if (lastQuestion && lastQuestion.length < 60) {
+                        // Convert question to statement if possible, or just use generic "Answer this"
+                        dynamicSuggestions.push("Answer this question");
+                    }
+                }
+
+                // 2. Add Contextual "Tell me more" based on keywords
+                const lowerReply = response.reply.toLowerCase();
+                if (lowerReply.includes("career") || lowerReply.includes("job")) dynamicSuggestions.push("Tell me more about Career");
+                if (lowerReply.includes("relationship") || lowerReply.includes("love") || lowerReply.includes("marriage")) dynamicSuggestions.push("Explore Relationship deeper");
+                if (lowerReply.includes("health")) dynamicSuggestions.push("What about Health details?");
+
+                // 3. Always have 'Explain in detail' as fallback
+                dynamicSuggestions.push("Explain this in detail");
+
+                // 4. Remedies if negative context
+                if (lowerReply.includes("challenge") || lowerReply.includes("difficult") || lowerReply.includes("saturn") || lowerReply.includes("rahu")) {
+                    dynamicSuggestions.push("What remedies can help?");
+                }
+
+                // Ensure unique and max 3
+                const uniqueSuggestions = Array.from(new Set(dynamicSuggestions)).slice(0, 3);
+                setSuggestionPrompts(uniqueSuggestions.length > 0 ? uniqueSuggestions : ["Explain in detail", "What remedies help?", "Tell me more"]);
             }
 
         } catch (error: any) {
@@ -897,43 +921,59 @@ function ChatContent() {
                             </div>
                         )}
 
-                        {/* BLOCKED/NO CREDITS STATE */}
+                        {/* BLOCKED/NO CREDITS STATE (Paywall Style) */}
                         {credits !== null && credits <= 0 && (
-                            <>
-                                <div className="blur-md select-none pointer-events-none opacity-40 space-y-8" aria-hidden="true">
-                                    {[1, 2, 3, 4].map((i) => (
-                                        <div key={i} className={`flex gap-4 max-w-2xl ${i % 2 === 0 ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}>
-                                            <div className="w-8 h-8 rounded-full bg-slate-200 shrink-0" />
-                                            <div className={`p-5 rounded-3xl w-full h-32 ${i % 2 === 0 ? 'bg-indigo-600' : 'bg-white border border-slate-100'}`} />
+                            <div className="relative h-full overflow-hidden">
+                                {/* Blurred Background Content (Teaser) */}
+                                <div className="space-y-6 opacity-50 blur-[2px] pointer-events-none select-none px-4 md:px-0">
+                                    {/* Show last few messages to give context, but fade them out */}
+                                    {visibleMessages.slice(-3).map((msg, i) => (
+                                        <div key={i} className={`flex gap-3 max-w-3xl ${msg.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}>
+                                            <div className="w-8 h-8 rounded-xl bg-slate-200 shrink-0" />
+                                            <div className={`p-4 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-indigo-600/20' : 'bg-slate-100'} w-full`}>
+                                                <p className="line-clamp-2">{msg.content.substring(0, 100)}...</p>
+                                                <div className="h-4 w-full bg-slate-200/50 rounded mt-2" />
+                                                <div className="h-4 w-3/4 bg-slate-200/50 rounded mt-2" />
+                                                <div className="h-4 w-5/6 bg-slate-200/50 rounded mt-2" />
+                                            </div>
                                         </div>
                                     ))}
+                                    {/* Fake extra content to fill space */}
+                                    <div className="flex gap-3 max-w-3xl mr-auto">
+                                        <div className="w-8 h-8 rounded-xl bg-slate-200 shrink-0" />
+                                        <div className="bg-slate-50 p-4 rounded-2xl w-full h-40" />
+                                    </div>
                                 </div>
 
-                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center">
+                                {/* Paywall Overlay */}
+                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gradient-to-t from-white via-white/80 to-transparent">
                                     <motion.div
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        className="bg-white/90 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 text-center max-w-sm mx-4 ring-1 ring-black/5"
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100 text-center max-w-sm mx-4"
                                     >
-                                        <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500">
-                                            <Coins className="w-8 h-8" />
+                                        <div className="w-14 h-14 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-600">
+                                            <Coins className="w-7 h-7" />
                                         </div>
-                                        <h3 className="text-xl font-bold text-slate-900 mb-2">Out of Credits</h3>
-                                        <p className="text-slate-600 mb-6 text-sm leading-relaxed">
-                                            Your session has ended. To reveal the chat history and continue asking questions, please top up your credits.
+                                        <h3 className="text-xl font-bold text-slate-900 mb-2">Read the full prediction</h3>
+                                        <p className="text-slate-500 mb-6 text-sm">
+                                            Your free messages are over. Unlock the rest of this conversation and ask more questions.
                                         </p>
                                         <button
-                                            onClick={() => setShowPayModal(true)}
-                                            className="w-full py-3.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-slate-900/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                            onClick={() => {
+                                                console.log("Recharge clicked from paywall");
+                                                setShowPayModal(true);
+                                            }}
+                                            className="w-full py-3.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
                                         >
-                                            Recharge to Unlock
+                                            Get Credits
                                         </button>
                                     </motion.div>
                                 </div>
-                            </>
+                            </div>
                         )}
 
-                        {/* ACTIVE STATE */}
+                        {/* ACTIVE STATE (Only when credits > 0) */}
                         {credits !== null && credits > 0 && (
                             <>
                                 {visibleMessages.length === 0 && !isTyping ? (

@@ -1,17 +1,17 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { OpenAI } from "openai";
-import { GoogleGenAI } from "@google/genai";
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-// Initialize OpenAI client
+// Initialize OpenRouter client (OpenAI compatible)
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+        "HTTP-Referer": "https://parihaaram.in", // Site URL
+        "X-Title": "Parihaaram", // Site Name
+    }
 });
-
-// Initialize Gemini client
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Helper: Calculate Chart Data on the fly if missing
 async function calculateChartData(dob: string, tob: string, lat: number, lon: number) {
@@ -57,9 +57,6 @@ async function calculateChartData(dob: string, tob: string, lat: number, lon: nu
 export async function POST(req: NextRequest) {
     try {
         const cookieStore = await cookies();
-
-        // ... (rest of auth/settings logic)
-
 
         // Initialize Supabase Server Client
         const supabase = createServerClient(
@@ -115,7 +112,22 @@ export async function POST(req: NextRequest) {
             .select('*')
             .single();
 
-        const selectedModel = settings?.ai_model || 'gemini-2.0-flash'; // Default to Gemini 2.0 Flash
+        let selectedModel = settings?.ai_model || 'google/gemini-3-flash-preview';
+
+        // Map simplified names to OpenRouter IDs
+        const modelMappings: Record<string, string> = {
+            'gemini-3.0-flash': 'google/gemini-3-flash-preview',
+            'gemini-3.0-pro': 'google/gemini-3-flash-preview', // Mapping pro to flash preview for now if 3.0 pro is not available
+            'gemini-2.0-flash': 'google/gemini-2.0-flash-001',
+            'gemini-2.5-flash': 'google/gemini-2.0-flash-001', // Legacy fallback
+            'gpt-4o': 'openai/gpt-4o',
+            'gpt-4-turbo': 'openai/gpt-4-turbo',
+            'gpt-3.5-turbo': 'openai/gpt-3.5-turbo',
+        };
+
+        if (modelMappings[selectedModel]) {
+            selectedModel = modelMappings[selectedModel];
+        }
 
         const body = await req.json();
         const { messages, context } = body;
@@ -147,7 +159,20 @@ export async function POST(req: NextRequest) {
 
         if (masterPrompt && isFirstMessage) {
             systemPrompt = masterPrompt + "\n\n";
-            console.log('[Master Prompt] Applied for initial life prediction');
+
+            // --- STRICT STRUCTURE FOR FIRST MESSAGE (LIFE PREDICTION) ---
+            systemPrompt += `\n\nRESPONSE STRUCTURE FOR THIS INITIAL MESSAGE (STRICTLY FOLLOW):
+1. **The Essence (Who You Are)**: A DETAILED deep dive into their core nature, strengths, and hidden personality traits. Do not be brief.
+2. **The Past (Relatable Context)**: detailed analysis of the previous phase they just came out of (struggles, lessons, major events) to build emotional connection.
+3. **The Present (Current Vibe)**: Comprehensive look at their current state—career, mental peace, and relationships.
+4. **The Future (What's Next)**: A clear, detailed timeline of the upcoming phase (next 6-12 months).
+
+FINAL STEP (Do NOT label this section):
+End the response naturally with a specific, thought-provoking question related to their chart to encourage them to explore deeper. Do not use a header for this.
+
+IMPORTANT: This must be a "Deep Dive" life reading, NOT a summary. Be thorough, relatable, and specific.`;
+
+            console.log('[Master Prompt] Applied for initial life prediction with STRICT STRUCTURE');
         } else if (!isFirstMessage) {
             console.log('[Master Prompt] Skipped - not first message');
         }
@@ -171,8 +196,6 @@ You are a helpful assistant.
 PRIVACY CHECK: If the user asks about your underlying AI model (e.g. GPT, Gemini, Cluade) or your identity, do NOT reveal the model name. Simply state you are Parihaaram AI.
 Otherwise, answer the user's question directly based on the provided context.`;
         }
-
-        // (Previous instructions removed to use global Interaction Guidelines at the end)
 
         if (context) {
             const { primaryProfile, secondaryProfile } = context;
@@ -358,56 +381,24 @@ Note: Precise chart data unavailable.
 1. NO CUTOFFS: Ensure your response is complete.
 2. CONCISE & STANDARD: Keep answers short and high-quality. Focus on the core message.
 3. NO DEEP IMPLICATIONS: Avoid complex technical jargon or deep astrological theory unless explicitly asked. Focus on practical guidance.
-4. ENGAGE THE USER: **CRITICAL**: END every response with a short, thought-provoking follow-up question related to their chart or life to encourage them to ask more. Example: "Would you like to know how this affects your career specifically?"
-5. CONSULTATION HANDOFF: If the user asks for highly specific event timing (e.g., "Exactly when will I get married?"), deep karmic analysis, or complex medical astrology, politely explain that such deep analysis requires human intuition and suggest they "Book a Consultation" with our expert astrologers for a detailed reading.`;
+4. ENGAGE THE USER: **CRITICAL**: END every response with a short, thought-provoking follow-up question related to their chart or life to encourage them to ask more. Example: "Would you like to know how this affects your career specifically?"`;
 
         let reply = "";
 
-        console.log(`--- Using Model: ${selectedModel.toUpperCase()} ---`);
+        console.log(`--- Using Model: ${selectedModel.toUpperCase()} (via OpenRouter) ---`);
 
-        if (selectedModel.startsWith('gemini')) {
-            console.log(`--- Using Model: GEMINI-2.0-FLASH ---`);
-            // --- GEMINI HANDLER ---
+        // --- UNIFIED OPENAI / OPENROUTER HANDLER ---
+        const completion = await openai.chat.completions.create({
+            model: selectedModel,
+            messages: [
+                { role: "system", content: systemPrompt },
+                ...messages
+            ],
+            temperature: temperature,
+            max_tokens: maxTokens,
+        });
 
-            // Map messages to Gemini Content format
-            const contents = messages
-                .filter((m: any) => m.role === 'user' || m.role === 'assistant')
-                .map((m: any) => ({
-                    role: m.role === 'assistant' ? 'model' : 'user',
-                    parts: [{ text: m.content }]
-                }));
-
-            try {
-                const response = await genAI.models.generateContent({
-                    model: "gemini-2.0-flash",
-                    contents: contents,
-                    config: {
-                        systemInstruction: systemPrompt,
-                        temperature: temperature,
-                        maxOutputTokens: maxTokens,
-                    },
-                });
-
-                reply = response.text || "";
-            } catch (flashError: any) {
-                console.error("⚠️ GEMINI 2.5 FLASH FAILED:", flashError.message);
-                throw flashError;
-            }
-
-        } else {
-            // --- OPENAI HANDLER (Default) ---
-            const completion = await openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    ...messages
-                ],
-                temperature: temperature,
-                max_tokens: maxTokens,
-            });
-
-            reply = completion.choices[0].message.content || "";
-        }
+        reply = completion.choices[0].message.content || "";
 
         console.log("LLM Reply:", reply);
         console.log("------------------------------------------------------------------");

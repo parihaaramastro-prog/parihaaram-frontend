@@ -8,7 +8,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@google/genai": "^1.35.0",
     "@ishubhamx/panchangam-js": "^1.0.3",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.91.1",

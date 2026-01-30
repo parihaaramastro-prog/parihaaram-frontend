@@ -84,6 +84,9 @@ export default function AdminDashboard() {
     const [selectedReview, setSelectedReview] = useState<any | null>(null);
     const [reviewContent, setReviewContent] = useState("");
     const [publishing, setPublishing] = useState(false);
+    // Admin Security State
+    const [newAdminPassword, setNewAdminPassword] = useState("");
+    const [updatingPassword, setUpdatingPassword] = useState(false);
 
     const fetchData = async () => {
         setLoading(true);
@@ -405,6 +408,41 @@ export default function AdminDashboard() {
             alert("Failed to publish report.");
         } finally {
             setPublishing(false);
+        }
+    };
+
+    const handleDeleteUser = async (user: any) => {
+        if (!confirm(`PERMANENTLY DELETE user "${user.email}"? This cannot be undone.`)) return;
+
+        try {
+            const res = await fetch('/api/admin/users', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id })
+            });
+
+            if (!res.ok) throw new Error("Delete failed");
+
+            alert("User deleted permanently.");
+            fetchData();
+        } catch (e: any) {
+            alert("Error: " + e.message);
+        }
+    };
+
+    const handleUpdateAdminPassword = async () => {
+        if (!newAdminPassword) return;
+        setUpdatingPassword(true);
+        try {
+            const supabase = createClient();
+            const { error } = await supabase.auth.updateUser({ password: newAdminPassword });
+            if (error) throw error;
+            alert("Your password has been updated successfully.");
+            setNewAdminPassword("");
+        } catch (e: any) {
+            alert("Failed to update password: " + e.message);
+        } finally {
+            setUpdatingPassword(false);
         }
     };
 
@@ -786,10 +824,10 @@ export default function AdminDashboard() {
                                                         </button>
                                                         <button
                                                             className="p-2 hover:bg-slate-100 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
-                                                            title="Block / Delete"
-                                                            onClick={() => handleRemoveStaff(u.id)} // Reusing the destructive modal for simplicity or create new one
+                                                            title={u.role === 'astrologer' ? "Revoke Staff Access" : "Delete User"}
+                                                            onClick={() => u.role === 'astrologer' ? handleRemoveStaff(u.id) : handleDeleteUser(u)}
                                                         >
-                                                            <Shield className="w-4 h-4" />
+                                                            {u.role === 'astrologer' ? <Shield className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
                                                         </button>
                                                     </td>
                                                 </tr>
@@ -846,7 +884,7 @@ export default function AdminDashboard() {
                                     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
                                         <h3 className="text-base font-bold text-slate-900">AI Model</h3>
                                         <div className="space-y-3">
-                                            {['gpt-4o', 'gemini-2.0-flash', 'gemini-2.5-flash'].map(m => (
+                                            {['gpt-4o', 'gemini-3.0-flash', 'gemini-3.0-pro', 'gemini-2.0-flash'].map(m => (
                                                 <button key={m} onClick={() => setAiModel(m)} className={`w-full py-3 px-4 rounded-lg border text-left flex items-center justify-between ${aiModel === m ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'border-slate-200 text-slate-600'}`}>
                                                     <span className="text-xs font-bold uppercase tracking-widest">{m}</span>
                                                     {aiModel === m && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
@@ -854,6 +892,36 @@ export default function AdminDashboard() {
                                             ))}
                                             <button onClick={saveModel} className="w-full py-2 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest mt-2">Save Preference</button>
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* Security Section */}
+                                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-red-50 rounded-lg"><ShieldCheck className="w-5 h-5 text-red-600" /></div>
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-900">Admin Security</h3>
+                                            <p className="text-xs text-slate-500">Update your access credentials.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 items-end">
+                                        <div className="flex-1 space-y-2">
+                                            <label className="text-xs font-bold text-slate-400 uppercase">New Password</label>
+                                            <input
+                                                type="password"
+                                                value={newAdminPassword}
+                                                onChange={e => setNewAdminPassword(e.target.value)}
+                                                placeholder="Enter new strong password"
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm font-bold focus:border-indigo-600 outline-none"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={handleUpdateAdminPassword}
+                                            disabled={!newAdminPassword || updatingPassword}
+                                            className="px-6 py-3 bg-red-600 text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-red-700 disabled:opacity-50 transition-all"
+                                        >
+                                            {updatingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update Password"}
+                                        </button>
                                     </div>
                                 </div>
                             </motion.div>
@@ -1037,7 +1105,7 @@ export default function AdminDashboard() {
                 )}
             </AnimatePresence>
 
-        </main>
+        </main >
     );
 }
 

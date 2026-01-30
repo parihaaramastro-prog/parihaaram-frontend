@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { OpenAI } from "openai";
 
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const openai = new OpenAI({
+    apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+        "HTTP-Referer": "https://parihaaram.in",
+        "X-Title": "Parihaaram",
+    }
+});
 
 export async function POST(req: NextRequest) {
     try {
@@ -36,15 +43,12 @@ ${chartData.planets?.map((p: any) => `${p.name} in ${p.sign} (House ${p.house})`
 Generate the summary now.
 `;
 
-        const response = await genAI.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: [{
-                role: "user",
-                parts: [{ text: prompt }]
-            }]
+        const completion = await openai.chat.completions.create({
+            model: "google/gemini-3-flash-preview",
+            messages: [{ role: "user", content: prompt }],
         });
 
-        const text = response.text || "";
+        const text = completion.choices[0].message.content || "";
 
         return NextResponse.json({ summary: text });
 
