@@ -485,6 +485,13 @@ export default function AdminDashboard() {
                 </nav>
 
                 <div className="flex items-center gap-4">
+                    <Link
+                        href="/admin/charts"
+                        className="hidden md:flex px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-slate-800 transition-all items-center gap-2 mr-4 border border-slate-700 shadow-sm"
+                    >
+                        <Database className="w-3 h-3 text-indigo-400" />
+                        Global Charts
+                    </Link>
                     <div className="hidden lg:flex items-center gap-6 px-6 border-l border-slate-200 h-10">
                         <div className="flex flex-col items-end">
                             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Inquiries</span>

@@ -418,26 +418,29 @@ Note: Precise chart data unavailable.
         console.log("LLM Reply:", reply);
         console.log("------------------------------------------------------------------");
 
-
-        // Log to DB (Fire and forget, don't await blocking)
-        supabase.from('chat_logs').insert({
-            user_id: user.id,
-            model: selectedModel,
-            user_message: lastMessage,
-            ai_response: reply,
-            system_prompt_snapshot: systemPrompt,
-            context_snapshot: JSON.stringify(context || {})
-        }).then(({ error }) => {
-            if (error) console.warn("Failed to log chat:", error.message);
-        });
-
-        // 4. Deduct Credit
+        // 4. Deduct Credit (awaiting this first to ensure accounting)
         const { data: updatedCredit } = await supabase
             .from('user_credits')
             .update({ credits: creditData.credits - 1 })
             .eq('user_id', user.id)
             .select()
             .single();
+
+        // 5. Log to DB (Await to ensure it survives serverless execution)
+        const { error: logError } = await supabase.from('chat_logs').insert({
+            user_id: user.id,
+            model: selectedModel,
+            user_message: lastMessage,
+            ai_response: reply,
+            system_prompt_snapshot: systemPrompt,
+            context_snapshot: JSON.stringify(context || {})
+        });
+
+        if (logError) {
+            console.error("CRITICAL: Failed to log chat to DB:", logError.message);
+        } else {
+            console.log("[Chat API] Log saved successfully.");
+        }
 
         return NextResponse.json({
             reply,
