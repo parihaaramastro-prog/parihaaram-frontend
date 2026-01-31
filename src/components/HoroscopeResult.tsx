@@ -358,10 +358,30 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                             </p>
                         </div>
                     ) : (
-                        <div className="prose prose-sm prose-indigo max-w-none">
-                            <p className="text-slate-700 leading-relaxed font-medium">
-                                {aiSummary}
-                            </p>
+                        <div className="space-y-4">
+                            <div className="prose prose-sm prose-indigo max-w-none">
+                                <p className="text-slate-700 leading-relaxed font-medium line-clamp-4">
+                                    {aiSummary}
+                                </p>
+                            </div>
+
+                            {/* Upsell / Chat Context Button */}
+                            <div className="pt-2">
+                                <Link href={`/chat?context=${encodeURIComponent(JSON.stringify({
+                                    name: inputData.name,
+                                    dob: inputData.dob,
+                                    tob: inputData.tob,
+                                    pob: inputData.pob,
+                                    lagna: results.lagna.name,
+                                    moon: results.moon_sign.name,
+                                    nakshatra: results.nakshatra.name
+                                }))}`}>
+                                    <button className="flex items-center gap-2 text-xs font-bold text-indigo-600 uppercase tracking-widest hover:text-indigo-800 transition-colors bg-indigo-50 px-4 py-2 rounded-lg border border-indigo-100 hover:bg-indigo-100">
+                                        <MessageSquare className="w-4 h-4" />
+                                        {language === 'ta' ? 'மேலும் அறிய AI-உடன் பேசுங்கள்' : 'Read Full Analysis & Chat with AI'}
+                                    </button>
+                                </Link>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -369,7 +389,7 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                     {/* Main Chart */}
                     <section className="space-y-6 h-full">
-                        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-3 gap-1">
                             <h3 className="text-lg font-bold text-slate-900 uppercase tracking-wide">{t.mainChart}</h3>
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">{t.structural}</span>
                         </div>
@@ -390,7 +410,7 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                     {/* Navamsa Chart */}
                     {results.navamsa_chart && (
                         <section className="space-y-6 h-full">
-                            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-3 gap-1">
                                 <h3 className="text-lg font-bold text-slate-900 uppercase tracking-wide">{t.divisionalChart}</h3>
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">{t.internalStrength}</span>
                             </div>
@@ -406,11 +426,22 @@ export default function HoroscopeResult({ results, onReset, inputData, language 
                     )}
                 </div>
 
-                {/* Dasha Timeline */}
                 <div className="space-y-6">
-                    <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                        <h3 className="text-lg font-bold text-slate-900 uppercase tracking-wide">{t.periods}</h3>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Vimshottari Dasha</span>
+                    <div className="border-b border-slate-200 pb-3">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between mb-2 gap-1">
+                            <h3 className="text-lg font-bold text-slate-900 uppercase tracking-wide">{t.periods}</h3>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Vimshottari Dasha</span>
+                        </div>
+                        <p className="text-xs text-slate-500 leading-relaxed max-w-2xl">
+                            {language === 'ta'
+                                ? "விம்ஷோத்தரி தசா முறை என்பது உங்கள் வாழ்க்கையின் முக்கிய கால கட்டங்களை கிரகங்களின் ஆதிக்கத்தின் அடிப்படையில் கணிக்கிறது."
+                                : "The Vimshottari Dasha system maps the major periods of your life governed by specific planets, revealing the timing of key life events."}
+                            <span className="block mt-1 text-[10px] text-slate-400">
+                                {language === 'ta'
+                                    ? "தசா (Dasha) என்பது பெரிய காலம் (ஆண்டுகள்), புத்தி (Bhukti) என்பது அதற்குள் வரும் சிறிய காலம் (மாதங்கள்)."
+                                    : "Dasha = Major Period (Years), Bhukti = Sub-period (Months)."}
+                            </span>
+                        </p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {results.mahadashas

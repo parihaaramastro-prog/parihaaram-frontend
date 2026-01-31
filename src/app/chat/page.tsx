@@ -209,14 +209,44 @@ function ChatContent() {
     const [validatingVibeCheck, setValidatingVibeCheck] = useState(false);
     const [autoStartProcessed, setAutoStartProcessed] = useState(false);
 
-    // Auto-Start Check (New User from Landing / VibeCheck)
+    // Auto-Start Check
     useEffect(() => {
         const mode = searchParams.get('new');
         const profileIdFromUrl = searchParams.get('profileId');
+        const contextParam = searchParams.get('context');
 
-        // Prevent re-running after we've already processed
+        // Prevent re-running
         if (autoStartProcessed) return;
 
+        // MODE 1: Contextual Chat (Calculated Result -> Chat)
+        if (contextParam) {
+            setAutoStartProcessed(true);
+            try {
+                const context = JSON.parse(decodeURIComponent(contextParam));
+                const prompt = `Here is my chart details:
+Name: ${context.name}
+DOB: ${new Date(context.dob).toLocaleDateString()}
+Time: ${context.tob}
+Place: ${context.pob}
+Lagna (Ascendant): ${context.lagna}
+Moon Sign: ${context.moon}
+Nakshatra: ${context.nakshatra}
+
+Please analyze my chart and give me a detailed prediction about my current time and future outlook.`;
+
+                // Create chat and send
+                if (userId) {
+                    createNewChat(prompt);
+                    // Clean URL
+                    router.replace('/chat');
+                }
+            } catch (e) {
+                console.error("Failed to parse context:", e);
+            }
+            return;
+        }
+
+        // MODE 2: Vibe Check
         if (mode === 'vibecheck' && userId && savedProfiles.length >= 2) {
             // Vibe Check Flow: Latest 2 profiles (Partner is usually latest [0], You are [1] or vice-versa depending on save order)
 
