@@ -450,18 +450,19 @@ export default function AdminDashboard() {
             }}></div>
 
             {/* Top Navigation Bar - Fixed */}
-            <header className="shrink-0 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-6 z-40 relative">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
-                        <ShieldCheck className="w-6 h-6" />
+            <header className="shrink-0 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex items-center justify-between px-4 md:px-6 z-40 relative">
+                <div className="flex items-center gap-3 md:gap-4">
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                        <ShieldCheck className="w-5 h-5 md:w-6 md:h-6" />
                     </div>
                     <div>
-                        <h1 className="text-base font-bold text-slate-900 uppercase tracking-widest leading-none">Command Center</h1>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Pariharam Admin</p>
+                        <h1 className="text-sm md:text-base font-bold text-slate-900 uppercase tracking-widest leading-none">Admin</h1>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-[0.2em] hidden md:block">Pariharam System</p>
                     </div>
                 </div>
 
-                <nav className="flex items-center bg-slate-100/50 p-1.5 rounded-xl">
+                {/* Desktop Nav */}
+                <nav className="hidden md:flex items-center bg-slate-100/50 p-1.5 rounded-xl">
                     {[
                         { id: 'overview', label: 'Monitor' },
                         { id: 'consultations', label: 'Pipeline' },
@@ -469,7 +470,7 @@ export default function AdminDashboard() {
                         { id: 'users', label: 'Users' },
                         { id: 'settings', label: 'Config' },
                         { id: 'ai-config', label: 'Intelligence' },
-                        { id: 'logs', label: 'Live Logs' }
+                        { id: 'logs', label: 'Logs' }
                     ].map((tab) => (
                         <button
                             key={tab.id}
@@ -484,24 +485,15 @@ export default function AdminDashboard() {
                     ))}
                 </nav>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 md:gap-4">
                     <Link
                         href="/admin/charts"
                         className="hidden md:flex px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-slate-800 transition-all items-center gap-2 mr-4 border border-slate-700 shadow-sm"
                     >
                         <Database className="w-3 h-3 text-indigo-400" />
-                        Global Charts
+                        Charts
                     </Link>
-                    <div className="hidden lg:flex items-center gap-6 px-6 border-l border-slate-200 h-10">
-                        <div className="flex flex-col items-end">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Inquiries</span>
-                            <span className="text-lg font-bold text-slate-900 leading-none">{stats.total}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pending</span>
-                            <span className="text-lg font-bold text-amber-600 leading-none">{stats.pending}</span>
-                        </div>
-                    </div>
+
                     <button
                         onClick={handleLogout}
                         className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all border border-transparent hover:border-red-100"
@@ -512,8 +504,35 @@ export default function AdminDashboard() {
                 </div>
             </header>
 
+            {/* Mobile Navigation (Scrollable) */}
+            <div className="md:hidden shrink-0 bg-white border-b border-slate-200 overflow-x-auto no-scrollbar">
+                <div className="flex p-2 gap-2 min-w-max">
+                    {[
+                        { id: 'overview', label: 'Monitor', icon: Activity },
+                        { id: 'consultations', label: 'Pipeline', icon: MessageSquare },
+                        { id: 'users', label: 'Users', icon: Users },
+                        { id: 'settings', label: 'Config', icon: Settings },
+                        { id: 'ai-config', label: 'AI', icon: Sparkles },
+                        { id: 'staff', label: 'Staff', icon: Shield },
+                        { id: 'logs', label: 'Logs', icon: Grid }
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${activeTab === tab.id
+                                ? 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                                : 'text-slate-500 border border-transparent'
+                                }`}
+                        >
+                            <tab.icon className="w-3 h-3" />
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* Scrollable Main Content */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 relative z-10">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 relative z-10">
                 <div className="max-w-[1600px] mx-auto space-y-6 pb-20">
 
                     <AnimatePresence mode="wait">
@@ -857,6 +876,44 @@ export default function AdminDashboard() {
                                         >
                                             {updatingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update Password"}
                                         </button>
+                                    </div>
+                                </div>
+                                {/* System Maintenance Section */}
+                                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-amber-50 rounded-lg"><Activity className="w-5 h-5 text-amber-600" /></div>
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-900">System Maintenance</h3>
+                                            <p className="text-xs text-slate-500">Advanced tools for data integrity.</p>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-slate-800">Regenerate All Charts</h4>
+                                                    <p className="text-[10px] text-slate-500 max-w-xs mt-1">
+                                                        Recalculate planetary positions and dasha periods for ALL users using the latest astrology engine logic.
+                                                        Use this if "Current Dasha" is outdated.
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!confirm("Are you sure? This will recalculate charts for ALL users. This may take a few minutes.")) return;
+                                                        try {
+                                                            const res = await fetch('/api/admin/regenerate-all?secret=98855d7322238c20ad6386cc6b1218733c2280db2c844b27a845e04b93b8c699');
+                                                            const data = await res.json();
+                                                            alert(`Regeneration Complete:\nTotal: ${data.total}\nUpdated: ${data.success_count}\nErrors: ${data.error_count}`);
+                                                        } catch (e: any) {
+                                                            alert("Failed: " + e.message);
+                                                        }
+                                                    }}
+                                                    className="px-4 py-2 bg-white border border-slate-200 hover:border-amber-500 text-slate-600 hover:text-amber-600 rounded-lg text-xs font-bold uppercase tracking-widest shadow-sm transition-all"
+                                                >
+                                                    Run Cycle
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </motion.div>
