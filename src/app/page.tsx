@@ -119,6 +119,23 @@ function HomeContent() {
         }
     };
 
+    useEffect(() => {
+        if (user && !results) {
+            const pendingCalc = sessionStorage.getItem('pending_calculation');
+            if (pendingCalc) {
+                console.log("🔄 Found pending calculation, auto-processing...");
+                try {
+                    const data = JSON.parse(pendingCalc);
+                    sessionStorage.removeItem('pending_calculation');
+                    handleCalculate(data);
+                } catch (e) {
+                    console.error("Error processing pending calculation:", e);
+                    sessionStorage.removeItem('pending_calculation');
+                }
+            }
+        }
+    }, [user, results]);
+
     return (
         <>
             {/* Announcement Bar */}

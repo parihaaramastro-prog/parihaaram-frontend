@@ -27,6 +27,15 @@ export const creditService = {
                 .single();
 
             if (createError) {
+                // If duplicate key error (race condition), fetch existing credits
+                if (createError.code === '23505') {
+                    const { data: existingData } = await supabase
+                        .from('user_credits')
+                        .select('credits')
+                        .eq('user_id', user.id)
+                        .single();
+                    return existingData?.credits || 0;
+                }
                 console.error("Error creating credit record:", createError);
                 return 0;
             }

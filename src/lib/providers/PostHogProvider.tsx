@@ -4,11 +4,13 @@ import { PostHogProvider } from 'posthog-js/react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
-    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY || 'phc_placeholder_key', {
-        api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
+if (typeof window !== 'undefined') {
+    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY || 'phc_uq2Bl5NolOwBNBhy3QY72pgDKAW90vwIQCATH4buThC', {
+        api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com',
+        defaults: '2025-11-30' as any, // Cast as any if TS complains, but adding it anyway
+        person_profiles: 'identified_only', // or 'always' to create profiles for anonymous users as well
         capture_pageview: false, // We manually capture pageviews for Next.js routing
-    });
+    })
 }
 
 function PostHogPageview() {

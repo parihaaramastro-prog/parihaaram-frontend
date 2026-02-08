@@ -123,7 +123,7 @@ export default function OverviewTab() {
                         PostHog Analytics
                     </h3>
                     <a
-                        href="https://us.posthog.com/project/settings"
+                        href="https://eu.posthog.com/project/settings"
                         target="_blank"
                         rel="noreferrer"
                         className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold uppercase tracking-widest"
@@ -137,7 +137,7 @@ export default function OverviewTab() {
                     2. Replace the src below OR store it in an environment variable e.g. NEXT_PUBLIC_POSTHOG_EMBED_URL
                 */}
                 <iframe
-                    src={process.env.NEXT_PUBLIC_POSTHOG_EMBED_URL || "https://us.posthog.com/shared/dashboard/default"}
+                    src={process.env.NEXT_PUBLIC_POSTHOG_EMBED_URL || "https://eu.posthog.com/shared/dashboard/default"}
                     width="100%"
                     height="100%"
                     frameBorder="0"

@@ -7,6 +7,10 @@ export interface User {
     role: UserRole;
     full_name: string | null;
     email: string;
+    birth_date?: string | null;
+    birth_time?: string | null;
+    birth_place?: string | null;
+    gender?: string | null;
 }
 
 export const profileService = {
@@ -48,7 +52,18 @@ export const profileService = {
                 .select()
                 .single();
 
-            if (error) throw error;
+            if (error) {
+                // If duplicate key error (race condition), fetch and return the existing user
+                if (error.code === '23505') {
+                    const { data: retryUser } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('id', user.id)
+                        .single();
+                    return retryUser as User;
+                }
+                throw error;
+            }
             return newUser as User;
         }
 

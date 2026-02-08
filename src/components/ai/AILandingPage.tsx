@@ -37,6 +37,7 @@ export default function AIAstrologerLanding() {
     const debounceTimer = useRef<NodeJS.Timeout | null>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
     const [loading, setLoading] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false); // New full-screen loading state
 
     // Click outside handler for suggestions
     useEffect(() => {
@@ -50,36 +51,80 @@ export default function AIAstrologerLanding() {
     }, []);
 
     // Listen for Auth Changes + Pending Data
+    // Listen for Auth Changes + Pending Data
+    // Processing Ref to prevent double execution
+    const processingRef = useRef(false);
+
+    // Listen for Auth Changes + Pending Data
     useEffect(() => {
         const supabase = createClient();
+
+        const processPending = async (userId: string) => {
+            // Prevent double execution
+            if (processingRef.current) {
+                console.log("Onboarding already in progress, skipping duplicate call.");
+                return;
+            }
+
+            const pending = localStorage.getItem('pending_ai_onboarding');
+            if (pending) {
+                processingRef.current = true; // Lock
+                console.log("Processing pending AI onboarding for user:", userId);
+                setIsProcessing(true); // Trigger overlay immediately
+                setIsAuthOpen(false); // Ensure modal is closed
+                try {
+                    const data = JSON.parse(pending);
+
+                    if (!data.name || !data.dob) {
+                        console.error("Invalid pending data:", data);
+                        localStorage.removeItem('pending_ai_onboarding');
+                        processingRef.current = false; // Unlock if invalid
+                        return;
+                    }
+
+                    await saveAndRedirect(userId, data);
+                    // Keep isProcessing true until redirect happens
+                } catch (e: any) {
+                    console.error("Error processing pending AI onboarding:", e.message || JSON.stringify(e));
+                    setIsProcessing(false); // Only turn off if error
+                    processingRef.current = false; // Unlock on error
+
+                    // Clear pending data on ANY error to prevent loops
+                    localStorage.removeItem('pending_ai_onboarding');
+
+                    alert("There was an issue processing your data. Please try again.");
+                }
+            } else {
+                router.replace('/chat');
+            }
+        };
 
         // Check already logged in
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
-                // If we are already logged in, we check if there's pending data (unlikely if they just landed, but possible if they refreshed during flow)
-                // If plain navigation, redirect to chat
                 const pending = localStorage.getItem('pending_ai_onboarding');
-                if (!pending) {
+                // If we have pending data, process it. 
+                // If NOT, we only redirect if we are NOT on the landing page (but we ARE on the landing page).
+                // Actually, if user is logged in and visits /ai, they might want to create a NEW chart.
+                // So we should ONLY redirect if there is PENDING data or if we clearly want to go to dashboard?
+                // The original code redirected to /chat if !pending. 
+                // This means checking session immediately redirects logged-in users to chat?
+                // That prevents logged-in users from using the landing page form?
+                // Let's keep original behavior: if !pending, redirect to /chat.
+                if (pending) {
+                    processPending(session.user.id);
+                } else {
                     router.replace('/chat');
                 }
             }
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (session?.user) {
+            if (event === 'SIGNED_IN' && session?.user) {
                 const pending = localStorage.getItem('pending_ai_onboarding');
                 if (pending) {
-                    try {
-                        const data = JSON.parse(pending);
-                        await saveAndRedirect(session.user.id, data);
-                        localStorage.removeItem('pending_ai_onboarding');
-                    } catch (e) {
-                        console.error("Error processing pending AI onboarding:", e);
-                        // If error, maybe still redirect?
-                        router.replace('/chat');
-                    }
+                    await processPending(session.user.id);
                 } else {
-                    // Logged in but no pending data (e.g. they just logged in via navbar)
                     router.replace('/chat');
                 }
             }
@@ -167,6 +212,10 @@ export default function AIAstrologerLanding() {
         if (savedProfileId) {
             params.set('profileId', savedProfileId);
         }
+
+        // Clear pending/onboarding data to prevent loops
+        localStorage.removeItem('pending_ai_onboarding');
+
         router.push(`/chat?${params.toString()}`);
     };
 
@@ -431,6 +480,25 @@ export default function AIAstrologerLanding() {
                 customTitle="Unlock Your Destiny"
                 customDescription="Join thousands of others. Create your free account to reveal your personal birth chart analysis instantly."
             />
+
+            {/* Full Screen Processing Overlay */}
+            <AnimatePresence>
+                {isProcessing && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center"
+                    >
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-indigo-500 blur-3xl opacity-20 animate-pulse" />
+                            <Loader2 className="w-16 h-16 text-indigo-400 animate-spin relative z-10" />
+                        </div>
+                        <h2 className="mt-8 text-2xl md:text-3xl font-bold text-white tracking-tight">Aligning Your Stars...</h2>
+                        <p className="mt-2 text-slate-400 font-medium max-w-sm animate-pulse">Calculating planetary positions and preparing your personalized AI prediction.</p>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </main>
     );
 }

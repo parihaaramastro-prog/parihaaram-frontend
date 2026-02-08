@@ -16,22 +16,22 @@ interface ArchiveLog {
 }
 
 export default function LogsTab() {
-    // Archives State
-    const [archives, setArchives] = useState<ArchiveLog[]>([]);
-    const [selectedArchive, setSelectedArchive] = useState<ArchiveLog | null>(null);
-    const [loadingArchives, setLoadingArchives] = useState(false);
-    const [archivePage, setArchivePage] = useState(0);
-    const [hasMoreArchives, setHasMoreArchives] = useState(true);
-
-    // Shared State
+    // Users List State
+    const [recentUsers, setRecentUsers] = useState<{ userId: string, lastActive: string, messageCount: number }[]>([]);
+    const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
     const [usersMap, setUsersMap] = useState<Record<string, { email: string, name: string }>>({});
+
+    // Chat View State
+    const [userLogs, setUserLogs] = useState<ArchiveLog[]>([]);
+    const [loadingChat, setLoadingChat] = useState(false);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const supabase = createClient();
 
-    // 1. Initial Setup: Fetch Users & Archives
+    // 1. Initial Setup: Fetch Users & Recent Chatters
     useEffect(() => {
         const fetchInitialData = async () => {
-            // Fetch Users Map
+            // A. Fetch Users Map
             try {
                 const res = await fetch('/api/admin/users');
                 const data = await res.json();
@@ -46,191 +46,223 @@ export default function LogsTab() {
                 console.warn("Could not fetch user details", e);
             }
 
-            fetchArchives();
+            // B. Fetch Recent Chatters
+            fetchRecentChatters();
         };
 
         fetchInitialData();
 
-        // Realtime Subscription for new logs
+        // 2. Realtime Subscription
         const archiveChannel = supabase
             .channel('admin-archives-monitor')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_logs' }, (payload) => {
-                setArchives(prev => [payload.new as ArchiveLog, ...prev]);
+                const newLog = payload.new as ArchiveLog;
+
+                // Update active chat if viewing this user
+                if (selectedUserId === newLog.user_id) {
+                    setUserLogs(prev => [...prev, newLog]);
+                }
+
+                // Update Sidebar List (Bump user to top)
+                setRecentUsers(prev => {
+                    const filtered = prev.filter(u => u.userId !== newLog.user_id);
+                    const existingCount = prev.find(u => u.userId === newLog.user_id)?.messageCount || 0;
+                    return [{ userId: newLog.user_id, lastActive: newLog.created_at, messageCount: existingCount + 1 }, ...filtered];
+                });
             })
             .subscribe();
 
         return () => {
             supabase.removeChannel(archiveChannel);
         };
-    }, []);
+    }, [selectedUserId]);
 
-    // Background polling to ensure freshness
+    const fetchRecentChatters = async () => {
+        // Fetch last 1000 logs to find active users
+        const { data, error } = await supabase
+            .from('chat_logs')
+            .select('user_id, created_at')
+            .order('created_at', { ascending: false })
+            .limit(1000);
+
+        if (!error && data) {
+            const uniqueUsers = new Map<string, { userId: string, lastActive: string, count: number }>();
+
+            data.forEach(log => {
+                // Safe access to user_id
+                const uid = log.user_id || 'unknown';
+                if (!uniqueUsers.has(uid)) {
+                    uniqueUsers.set(uid, { userId: uid, lastActive: log.created_at, count: 1 });
+                } else {
+                    const u = uniqueUsers.get(uid)!;
+                    u.count++;
+                    // keep earliest 'lastActive' which is actually most recent since we iterated desc? Yes.
+                }
+            });
+
+            setRecentUsers(Array.from(uniqueUsers.values()));
+        }
+    };
+
+    // 3. Fetch specific user logs when selected
     useEffect(() => {
-        const pollLatestLogs = async () => {
+        if (!selectedUserId) return;
+
+        const loadUserChat = async () => {
+            setLoadingChat(true);
             const { data, error } = await supabase
                 .from('chat_logs')
                 .select('*')
-                .order('created_at', { ascending: false })
-                .range(0, 19);
+                .eq('user_id', selectedUserId)
+                .order('created_at', { ascending: true }) // Chronological for chat
+                .limit(100); // Last 100 messages
 
             if (!error && data) {
-                setArchives(prev => {
-                    const existingIds = new Set(prev.map(p => p.id));
-                    const newLogs = data.filter(log => !existingIds.has(log.id));
-
-                    if (newLogs.length > 0) {
-                        return [...newLogs, ...prev];
-                    }
-                    return prev;
-                });
+                setUserLogs(data);
             }
+            setLoadingChat(false);
         };
 
-        const intervalId = setInterval(pollLatestLogs, 3000);
-        return () => clearInterval(intervalId);
-    }, []);
+        loadUserChat();
+    }, [selectedUserId]);
 
-    const fetchArchives = async (page = 0, append = false) => {
-        if (page === 0) setLoadingArchives(true);
-
-        const PAGE_SIZE = 50;
-        const from = page * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
-
-        const { data, error } = await supabase
-            .from('chat_logs')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .range(from, to);
-
-        if (!error && data) {
-            if (append) {
-                setArchives(prev => [...prev, ...data]);
-            } else {
-                setArchives(data);
-            }
-            setHasMoreArchives(data.length === PAGE_SIZE);
-        }
-        setLoadingArchives(false);
-    };
-
-    // Scroll effect
+    // Auto-scroll to bottom of chat
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [selectedArchive]);
-
-    const handleLoadMoreArchives = () => {
-        const nextPage = archivePage + 1;
-        setArchivePage(nextPage);
-        fetchArchives(nextPage, true);
-    };
+    }, [userLogs]);
 
     return (
         <div className="h-[calc(100vh-140px)] flex bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            {/* Sidebar */}
-            <div className={`w-full md:w-80 border-r border-slate-200 flex flex-col bg-slate-50 ${selectedArchive ? 'hidden md:flex' : 'flex'}`}>
+            {/* Sidebar: User List */}
+            <div className={`w-full md:w-80 border-r border-slate-200 flex flex-col bg-slate-50 ${selectedUserId ? 'hidden md:flex' : 'flex'}`}>
 
                 {/* Header */}
                 <div className="p-4 bg-white border-b border-slate-200 flex items-center justify-between">
                     <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2">
-                        <Terminal className="w-4 h-4 text-slate-900" />
-                        System Logs
+                        <User className="w-4 h-4 text-slate-900" />
+                        Active Users
                     </h3>
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span className="text-[10px] font-bold text-emerald-500 uppercase">Live</span>
+                    <div className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[10px] font-bold">
+                        {recentUsers.length} Recent
                     </div>
                 </div>
 
-                {/* List Content */}
+                {/* Users List */}
                 <div className="flex-1 overflow-y-auto">
-                    {loadingArchives && archives.length === 0 ? (
-                        <div className="p-8 text-center"><Loader2 className="w-6 h-6 text-slate-400 animate-spin mx-auto" /></div>
+                    {recentUsers.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400 text-xs">No recent chats found</div>
                     ) : (
-                        <div className="divide-y divide-slate-100 pb-4">
-                            {archives.map(log => {
-                                const user = usersMap[log.user_id];
+                        <div className="divide-y divide-slate-100">
+                            {recentUsers.map(u => {
+                                const userInfo = usersMap[u.userId];
+                                const isSelected = selectedUserId === u.userId;
                                 return (
                                     <button
-                                        key={log.id}
-                                        onClick={() => setSelectedArchive(log)}
-                                        className={`w-full p-4 text-left hover:bg-white transition-all ${selectedArchive?.id === log.id ? 'bg-white border-l-4 border-l-slate-900 shadow-sm' : 'border-l-4 border-l-transparent'}`}
+                                        key={u.userId}
+                                        onClick={() => setSelectedUserId(u.userId)}
+                                        className={`w-full p-4 text-left hover:bg-white transition-all group ${isSelected ? 'bg-white border-l-4 border-l-indigo-600 shadow-sm' : 'border-l-4 border-l-transparent text-slate-500 hover:text-slate-800'}`}
                                     >
-                                        <div className="flex justify-between items-start mb-1">
-                                            <span className="text-xs font-bold text-slate-900 truncate pr-2">
-                                                {user?.name || 'User #' + log.user_id.slice(0, 4)}
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className={`text-xs font-bold truncate pr-2 ${isSelected ? 'text-slate-900' : 'text-slate-700'}`}>
+                                                {userInfo?.name || 'User ' + u.userId.slice(0, 4)}
                                             </span>
-                                            <span className="text-[10px] text-slate-400 whitespace-nowrap">
-                                                {new Date(log.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                            <span className="text-[10px] opacity-50 whitespace-nowrap">
+                                                {new Date(u.lastActive).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                                             </span>
                                         </div>
-                                        <p className="text-[11px] text-slate-500 truncate mb-1.5">{log.user_message}</p>
-                                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                                            <History className="w-3 h-3" />
-                                            <span className="truncate max-w-[120px]">{log.model}</span>
+                                        <div className="flex items-center justify-between mt-2">
+                                            <p className="text-[10px] opacity-70 truncate max-w-[150px]">
+                                                {userInfo?.email || 'No email'}
+                                            </p>
+                                            <span className="text-[9px] bg-slate-200 px-1.5 py-0.5 rounded-full font-medium">
+                                                {u.messageCount > 50 ? '50+' : u.messageCount} msgs
+                                            </span>
                                         </div>
                                     </button>
                                 );
                             })}
-                            {hasMoreArchives && (
-                                <button
-                                    onClick={handleLoadMoreArchives}
-                                    className="w-full py-3 text-xs font-bold text-slate-500 hover:text-indigo-600 uppercase tracking-widest text-center"
-                                >
-                                    Load More
-                                </button>
-                            )}
                         </div>
                     )}
                 </div>
             </div>
 
             {/* Main Chat Area */}
-            <div className={`flex-1 flex flex-col bg-white h-full ${!selectedArchive ? 'hidden md:flex' : 'flex'}`}>
-                {/* Header */}
-                <div className="p-4 border-b border-slate-200 flex items-center justify-between shadow-sm z-10 min-h-[60px]">
+            <div className={`flex-1 flex flex-col bg-white h-full ${!selectedUserId ? 'hidden md:flex' : 'flex'}`}>
+                {/* Chat Header */}
+                <div className="p-4 border-b border-slate-200 flex items-center justify-between shadow-sm z-10 min-h-[60px] bg-white">
                     <div className="flex items-center gap-3">
-                        <button onClick={() => setSelectedArchive(null)} className="md:hidden p-2 -ml-2 hover:bg-slate-100 rounded-lg">
+                        <button onClick={() => setSelectedUserId(null)} className="md:hidden p-2 -ml-2 hover:bg-slate-100 rounded-lg">
                             <ArrowLeft className="w-5 h-5 text-slate-600" />
                         </button>
-                        {selectedArchive ? (
+                        {selectedUserId ? (
                             <div>
-                                <h3 className="text-sm font-bold text-slate-900">
-                                    {usersMap[selectedArchive.user_id]?.name || 'User'}
+                                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    {usersMap[selectedUserId]?.name || 'User #' + selectedUserId.slice(0, 4)}
+                                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[9px] uppercase">
+                                        Active
+                                    </span>
                                 </h3>
-                                <p className="text-xs text-slate-500 flex items-center gap-1">
-                                    Log ID: #{selectedArchive.id}
+                                <p className="text-xs text-slate-500">
+                                    {usersMap[selectedUserId]?.email || 'ID: ' + selectedUserId}
                                 </p>
                             </div>
                         ) : (
-                            <h3 className="text-sm font-bold text-slate-400">Select a log entry</h3>
+                            <h3 className="text-sm font-bold text-slate-400">Select a user to view conversation</h3>
                         )}
                     </div>
                 </div>
 
-                {/* Content */}
+                {/* Chat Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
-                    {selectedArchive ? (
-                        <>
-                            <ChatBubble role="user" content={selectedArchive.user_message} time={selectedArchive.created_at} />
-                            <ChatBubble role="ai" content={selectedArchive.ai_response} time={selectedArchive.created_at} />
-
-                            {/* Context for Archive */}
-                            <div className="mt-8 pt-8 border-t border-slate-200">
-                                <details className="group">
-                                    <summary className="text-[10px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer list-none flex items-center gap-2 hover:text-slate-600">
-                                        <span>▶</span> View Generation Context
-                                    </summary>
-                                    <pre className="mt-4 p-4 bg-slate-900 rounded-xl text-amber-500 text-[10px] font-mono whitespace-pre-wrap break-words">
-                                        {JSON.stringify(selectedArchive.context_snapshot, null, 2)}
-                                    </pre>
-                                </details>
+                    {selectedUserId ? (
+                        loadingChat ? (
+                            <div className="h-full flex items-center justify-center">
+                                <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
                             </div>
-                        </>
+                        ) : userLogs.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-slate-300">
+                                <MessageSquare className="w-12 h-12 mb-3 opacity-30" />
+                                <p>No logs found for this user</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="text-center pb-4">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
+                                        Start of recorded history
+                                    </span>
+                                </div>
+
+                                {userLogs.map((log) => (
+                                    <div key={log.id} className="space-y-6">
+                                        {/* User Message */}
+                                        <ChatBubble role="user" content={log.user_message} time={log.created_at} />
+
+                                        {/* AI Response */}
+                                        <div className="relative group">
+                                            <ChatBubble role="ai" content={log.ai_response} time={log.created_at} />
+
+                                            {/* Context Peek on Hover */}
+                                            {log.context_snapshot && (
+                                                <div className="ml-12 mt-1">
+                                                    <details className="inline-block">
+                                                        <summary className="text-[9px] text-indigo-400 cursor-pointer hover:text-indigo-600 font-medium select-none list-none flex items-center gap-1">
+                                                            <Terminal className="w-3 h-3" /> Debug Context
+                                                        </summary>
+                                                        <pre className="mt-2 p-3 bg-slate-900 rounded-lg text-amber-500 text-[9px] font-mono whitespace-pre-wrap max-w-lg shadow-xl relative z-20">
+                                                            {JSON.stringify(log.context_snapshot, null, 2)}
+                                                        </pre>
+                                                    </details>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </>
+                        )
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-slate-300">
-                            <Archive className="w-16 h-16 mb-4 opacity-50" />
-                            <p className="text-sm font-bold uppercase tracking-widest">Select a log to view details</p>
+                            <User className="w-16 h-16 mb-4 opacity-50" />
+                            <p className="text-sm font-bold uppercase tracking-widest">Select a user from the sidebar</p>
                         </div>
                     )}
                     <div ref={messagesEndRef} />

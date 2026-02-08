@@ -58,26 +58,36 @@ export async function GET(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
     try {
         const { userId } = await req.json();
+        console.log(`🗑️ [Admin] Deleting user: ${userId}`);
 
         if (!supabaseAdmin) throw new Error("MISSING_ENV: SUPABASE_SERVICE_ROLE_KEY");
 
-        // 1. Delete from Auth (this usually cascades if set up, but let's be sure)
-        const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-        if (authError) throw authError;
-
-        // 2. Delete from public.users (if no cascade)
-        // We use try-catch here because if foreign key fails or user doesn't exist, it's fine if auth is gone
+        // 1. Clean up public relations first (to prevent FK restriction errors)
         try {
-            await supabaseAdmin
-                .from('users')
-                .delete()
-                .eq('id', userId);
+            // Delete credits
+            const { error: creditError } = await supabaseAdmin.from('user_credits').delete().eq('user_id', userId);
+            if (creditError) console.warn("Credit delete warning:", creditError);
+
+            // Delete public profile
+            const { error: profileError } = await supabaseAdmin.from('users').delete().eq('id', userId);
+            if (profileError) console.warn("Profile delete warning:", profileError);
+
+            console.log("✅ [Admin] Public records cleaned up");
         } catch (e) {
-            console.warn("Public profile delete failed (might not exist):", e);
+            console.warn("⚠️ Public profile delete warning:", e);
         }
 
+        // 2. Delete from Auth - The Source of Truth
+        const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+        if (authError) {
+            console.error("❌ Auth delete failed:", authError);
+            throw authError;
+        }
+
+        console.log("✅ [Admin] Auth user deleted successfully");
         return NextResponse.json({ success: true });
     } catch (error: any) {
+        console.error("❌ Delete API Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

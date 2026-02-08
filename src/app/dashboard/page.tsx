@@ -32,6 +32,14 @@ function DashboardContent() {
 
     useEffect(() => {
         const supabase = createClient();
+
+        // Safety Check: If user ended up here but has pending AI work, send them back to /ai to finish processing
+        // This is safe now because /ai handles clearing the flag on both success and error.
+        if (localStorage.getItem('pending_ai_onboarding')) {
+            router.replace('/ai');
+            return;
+        }
+
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (!session) {
                 router.replace('/');
