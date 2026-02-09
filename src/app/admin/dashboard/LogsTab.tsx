@@ -86,16 +86,16 @@ export default function LogsTab() {
             .limit(1000);
 
         if (!error && data) {
-            const uniqueUsers = new Map<string, { userId: string, lastActive: string, count: number }>();
+            const uniqueUsers = new Map<string, { userId: string, lastActive: string, messageCount: number }>();
 
             data.forEach(log => {
                 // Safe access to user_id
                 const uid = log.user_id || 'unknown';
                 if (!uniqueUsers.has(uid)) {
-                    uniqueUsers.set(uid, { userId: uid, lastActive: log.created_at, count: 1 });
+                    uniqueUsers.set(uid, { userId: uid, lastActive: log.created_at, messageCount: 1 });
                 } else {
                     const u = uniqueUsers.get(uid)!;
-                    u.count++;
+                    u.messageCount++;
                     // keep earliest 'lastActive' which is actually most recent since we iterated desc? Yes.
                 }
             });
