@@ -60,10 +60,14 @@ export const profileService = {
                         .select('*')
                         .eq('id', user.id)
                         .single();
+
+                    if (!retryUser) throw new Error("Failed to retrieve existing user profile");
                     return retryUser as User;
                 }
                 throw error;
             }
+
+            if (!newUser) throw new Error("Failed to create new user profile");
             return newUser as User;
         }
 

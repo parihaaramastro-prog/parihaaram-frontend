@@ -56,8 +56,10 @@ export default function AIAstrologerLanding() {
     const processingRef = useRef(false);
 
     // Listen for Auth Changes + Pending Data
+    // Listen for Auth Changes + Pending Data
     useEffect(() => {
         const supabase = createClient();
+        let safetyTimeout: NodeJS.Timeout;
 
         const processPending = async (userId: string) => {
             // Prevent double execution
@@ -72,6 +74,17 @@ export default function AIAstrologerLanding() {
                 console.log("Processing pending AI onboarding for user:", userId);
                 setIsProcessing(true); // Trigger overlay immediately
                 setIsAuthOpen(false); // Ensure modal is closed
+
+                // Set a safety timeout to prevent infinite loading
+                safetyTimeout = setTimeout(() => {
+                    if (processingRef.current) {
+                        console.error("Onboarding timed out");
+                        setIsProcessing(false);
+                        processingRef.current = false;
+                        alert("The process is taking longer than expected. Please check your internet connection.");
+                    }
+                }, 15000); // 15 seconds max
+
                 try {
                     const data = JSON.parse(pending);
 
@@ -79,6 +92,7 @@ export default function AIAstrologerLanding() {
                         console.error("Invalid pending data:", data);
                         localStorage.removeItem('pending_ai_onboarding');
                         processingRef.current = false; // Unlock if invalid
+                        setIsProcessing(false);
                         return;
                     }
 
@@ -90,31 +104,23 @@ export default function AIAstrologerLanding() {
                     processingRef.current = false; // Unlock on error
 
                     // Clear pending data on ANY error to prevent loops
-                    localStorage.removeItem('pending_ai_onboarding');
+                    // localStorage.removeItem('pending_ai_onboarding'); // Optional: maybe keep it to retry? But loop risk.
 
                     alert("There was an issue processing your data. Please try again.");
+                } finally {
+                    clearTimeout(safetyTimeout);
                 }
-            } else {
-                router.replace('/chat');
             }
         };
 
         // Check already logged in
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
+                // If we have pending data, process it.
+                // Otherwise, stay on page (don't redirect) so user can use the form.
                 const pending = localStorage.getItem('pending_ai_onboarding');
-                // If we have pending data, process it. 
-                // If NOT, we only redirect if we are NOT on the landing page (but we ARE on the landing page).
-                // Actually, if user is logged in and visits /ai, they might want to create a NEW chart.
-                // So we should ONLY redirect if there is PENDING data or if we clearly want to go to dashboard?
-                // The original code redirected to /chat if !pending. 
-                // This means checking session immediately redirects logged-in users to chat?
-                // That prevents logged-in users from using the landing page form?
-                // Let's keep original behavior: if !pending, redirect to /chat.
                 if (pending) {
                     processPending(session.user.id);
-                } else {
-                    router.replace('/chat');
                 }
             }
         });
@@ -124,13 +130,14 @@ export default function AIAstrologerLanding() {
                 const pending = localStorage.getItem('pending_ai_onboarding');
                 if (pending) {
                     await processPending(session.user.id);
-                } else {
-                    router.replace('/chat');
                 }
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            subscription.unsubscribe();
+            if (safetyTimeout) clearTimeout(safetyTimeout);
+        };
     }, []);
 
     // City Search
@@ -190,21 +197,19 @@ export default function AIAstrologerLanding() {
         // 2. Create Saved Horoscope (so it appears in chat selector)
         let savedProfileId: string | null = null;
         if (data.lat && data.lon) {
-            try {
-                const savedProfile = await horoscopeService.saveHoroscope({
-                    name: data.name,
-                    dob: data.dob,
-                    tob: data.tob,
-                    pob: data.pob,
-                    lat: data.lat,
-                    lon: data.lon,
-                    gender: data.gender || 'male'
-                });
-                savedProfileId = savedProfile?.id || null;
-            } catch (e) {
-                console.warn("Could not save horoscope entry:", e);
-                // Proceed anyway, profile is updated
-            }
+            console.log("Saving new horoscope entry...");
+            // Let this throw if it fails, so we don't redirect to a broken state
+            const savedProfile = await horoscopeService.saveHoroscope({
+                name: data.name,
+                dob: data.dob,
+                tob: data.tob,
+                pob: data.pob,
+                lat: data.lat,
+                lon: data.lon,
+                gender: data.gender || 'male'
+            });
+            savedProfileId = savedProfile?.id || null;
+            console.log("Horoscope saved successfully:", savedProfileId);
         }
 
         // Navigate to chat with profile ID if available
